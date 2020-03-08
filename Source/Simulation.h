@@ -27,7 +27,9 @@ public:
 	void RenderUI();
 	void RunSimulation();
 	SimulationFrame GetSimulationFrame(float simTime);
+	SimulationFrame GetSimulationFrameFromIdx(int index);
 	bool HasResults()const;
+	int GetNumFrames();
 
 	float TotalSimTime;
 	float DeltaTime;

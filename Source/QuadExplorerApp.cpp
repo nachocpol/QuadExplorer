@@ -12,6 +12,7 @@
 QuadExplorerApp::QuadExplorerApp():
 	 mCurTime(0.0f)
 	,mLoopVisualization(true)
+	,mOverrideSimFrameIndex(0)
 {
 }
 
@@ -51,11 +52,14 @@ void QuadExplorerApp::Update()
 {
 	AppBase::Update();
 
+	// Render main config UI (also Quad and Sim UI):
 	RenderUI();
 
 	// Process visualization:
 	if (mSimulation.HasResults())
 	{
+		// Get current simulation frame (either from time or index)
+		SimulationFrame simFrame;
 		if (mLoopVisualization)
 		{
 			// Sim time:
@@ -64,11 +68,20 @@ void QuadExplorerApp::Update()
 			{
 				mCurTime = 0.0f;
 			}
+			// Get simulation frame:
+			simFrame = mSimulation.GetSimulationFrame(mCurTime);
 		}
-		// Get simulation frame:
-		SimulationFrame simFrame = mSimulation.GetSimulationFrame(mCurTime);
+		else
+		{
+			simFrame = mSimulation.GetSimulationFrameFromIdx(mOverrideSimFrameIndex);
+		}
 
 		mQuadActor->Transform->SetPosition(simFrame.QuadPosition);
+
+		// Display cur frame info:
+		ImGui::Begin("Quad Explorer");
+		ImGui::Text("Position x=%.3f y=%.3f z=%.3f", simFrame.QuadPosition.x, simFrame.QuadPosition.y, simFrame.QuadPosition.z);
+		ImGui::End();
 	}
 
 
@@ -91,6 +104,14 @@ void QuadExplorerApp::RenderUI()
 		mSimulation.RunSimulation();
 	}
 	ImGui::Checkbox("Loop Visualization", &mLoopVisualization);
+	if (mLoopVisualization)
+	{
+		// uh
+	}
+	else
+	{
+		ImGui::SliderInt("Sim Frame", &mOverrideSimFrameIndex, 0, mSimulation.GetNumFrames()-1);
+	}
 	ImGui::End();
 
 	// Display sim UI (this will also show quad UI)

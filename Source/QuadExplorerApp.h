@@ -35,6 +35,7 @@ private:
 	Quad mQuad;
 	float mCurTime;
 	bool mLoopVisualization;
+	int mOverrideSimFrameIndex;
 
 	// Visualization:
 	World::Actor* mQuadActor;

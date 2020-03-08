@@ -62,7 +62,21 @@ SimulationFrame Simulation::GetSimulationFrame(float simTime)
 	return mResult.Frames[index];
 }
 
+SimulationFrame Simulation::GetSimulationFrameFromIdx(int index)
+{
+	return mResult.Frames[index];
+}
+
 bool Simulation::HasResults() const
 {
 	return !mResult.Frames.empty();
+}
+
+int Simulation::GetNumFrames()
+{
+	if (HasResults())
+	{
+		return mResult.Frames.size();
+	}
+	return 0;
 }
