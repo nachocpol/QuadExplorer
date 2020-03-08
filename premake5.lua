@@ -8,7 +8,9 @@ filter { "platforms:x64" }
 	includedirs 
 	{
 		"Source",
-		"Depen/AwesomeEngine/Source"
+		"Depen/AwesomeEngine/Source",
+		"Depen/AwesomeEngine/Assets/Shaders",
+		"Depen/AwesomeEngine/Depen/GLM"
 	}
 
 filter {"configurations:Debug"}
