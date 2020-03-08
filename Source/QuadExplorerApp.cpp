@@ -23,14 +23,17 @@ void QuadExplorerApp::Init()
 
 	mRenderer.Initialize(this);
 	mScene.Initialize();
+
+	// Setup simulation and quad:
+	mSimulation.SetQuadTarget(&mQuad);
+
 }
 
 void QuadExplorerApp::Update()
 {
 	AppBase::Update();
 
-	ImGui::Begin("Quad Explorer");
-	ImGui::End();
+	RenderUI();
 
 	mScene.Update(DeltaTime);
 	mRenderer.Render(&mScene);
@@ -39,6 +42,21 @@ void QuadExplorerApp::Update()
 void QuadExplorerApp::Release()
 {
 	AppBase::Release();
+}
+
+void QuadExplorerApp::RenderUI()
+{
+	// Main U
+	ImGui::Begin("Quad Explorer");
+
+	if (ImGui::Button("Run Simulation"))
+	{
+
+	}
+	ImGui::End();
+
+	// Display sim UI (this will also show quad UI)
+	mSimulation.RenderUI();
 }
 
 QuadExplorerApp app;
