@@ -16,3 +16,9 @@ void Quad::RenderUI()
 	ImGui::InputFloat("Mass", &Mass);
 	ImGui::End();
 }
+
+void Quad::Reset()
+{
+	Position = glm::vec3(0.0f);
+	Orientation = glm::quat();
+}

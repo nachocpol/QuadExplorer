@@ -7,6 +7,15 @@
 #include "Simulation.h"
 #include "Quad.h"
 
+namespace World
+{
+	class Actor;
+}
+namespace Graphics
+{
+	struct Model;
+}
+
 class QuadExplorerApp : public AppBase
 {
 public:
@@ -24,4 +33,11 @@ private:
 
 	Simulation mSimulation;
 	Quad mQuad;
+	float mCurTime;
+	bool mLoopVisualization;
+
+	// Visualization:
+	World::Actor* mQuadActor;
+	World::Actor* mSimCamera;
+	Graphics::Model* mCubeModel;
 };
