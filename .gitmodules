@@ -1,0 +1,3 @@
+[submodule "Depen/AwesomeEngine"]
+	path = Depen/AwesomeEngine
+	url = https://github.com/piluve/AwesomeEngine.git
