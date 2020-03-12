@@ -10,7 +10,9 @@ filter { "platforms:x64" }
 		"Source",
 		"Depen/AwesomeEngine/Source",
 		"Depen/AwesomeEngine/Assets/Shaders",
-		"Depen/AwesomeEngine/Depen/GLM"
+		"Depen/AwesomeEngine/Depen/GLM",
+		"Depen/AwesomeEngine/Depen/PhysX/physx/include",
+		"Depen/AwesomeEngine/Depen/PhysX/pxshared/include",
 	}
 
 filter {"configurations:Debug"}

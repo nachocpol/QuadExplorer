@@ -6,6 +6,7 @@
 
 #include "Simulation.h"
 #include "Quad.h"
+#include "QuadFlyController.h"
 
 namespace World
 {
@@ -33,6 +34,7 @@ private:
 
 	Simulation mSimulation;
 	Quad mQuad;
+	QuadFlyController mFlyController;
 	float mCurTime;
 	bool mLoopVisualization;
 	int mOverrideSimFrameIndex;

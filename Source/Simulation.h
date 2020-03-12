@@ -23,6 +23,7 @@ class Simulation
 {
 public:
 	Simulation();
+	void Init();
 	void SetQuadTarget(Quad* quad);
 	void RenderUI();
 	void RunSimulation();

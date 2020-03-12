@@ -32,6 +32,7 @@ void QuadExplorerApp::Init()
 	mScene.Initialize();
 
 	// Setup simulation and quad:
+	mSimulation.Init();
 	mSimulation.SetQuadTarget(&mQuad);
 
 	// Setup visualization:
@@ -116,6 +117,8 @@ void QuadExplorerApp::RenderUI()
 
 	// Display sim UI (this will also show quad UI)
 	mSimulation.RenderUI();
+
+	mFlyController.RenderUI();
 }
 
 QuadExplorerApp app;
