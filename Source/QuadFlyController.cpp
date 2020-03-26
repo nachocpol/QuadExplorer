@@ -8,9 +8,12 @@ QuadFlyController::QuadFlyController():
 
 void QuadFlyController::RenderUI()
 {
-	ImGui::Begin("FC");
 	ImGui::InputFloat("Height Set Point", &HeightSetPoint);
-	ImGui::End();
+	if (ImGui::TreeNode("Height PID"))
+	{
+		HeightPID.RenderUI();
+		ImGui::TreePop();
+	}
 }
 
 FCCommands QuadFlyController::Iterate(const FCQuadState& state)
@@ -34,7 +37,26 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state)
 float PID::Get(float error, float deltaTime)
 {
 	float P = error;
+	
 	float I = 0.0f;
-	float D = 0.0f;
+	
+	float D = mFirst ? 0.0f : (error - mPrevError) / deltaTime;
+	mFirst = false;
+	mPrevError = error;
+
 	return P * KP + I * KI + D * KD;
 }
+
+void PID::Reset()
+{
+	mFirst = true;
+	mPrevError = 0.0f;
+}
+
+void PID::RenderUI()
+{
+	ImGui::InputFloat("KP", &KP);
+	ImGui::InputFloat("KI", &KI);
+	ImGui::InputFloat("KD", &KD);
+}
+

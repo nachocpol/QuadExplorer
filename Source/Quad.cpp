@@ -12,9 +12,7 @@ Quad::Quad():
 
 void Quad::RenderUI()
 {
-	ImGui::Begin("Quad");
 	ImGui::InputFloat("Mass", &Mass);
-	ImGui::End();
 }
 
 void Quad::Reset()

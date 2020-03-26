@@ -1,5 +1,6 @@
 #include "Simulation.h"
 #include "Quad.h"
+#include "QuadFlyController.h"
 #include "Graphics/UI/IMGUI/imgui.h"
 #include "Graphics/World/PhysicsWorld.h"
 #include "Core/Logging.h"
@@ -11,10 +12,11 @@
 using namespace physx;
 
 
-Simulation::Simulation():
-	 TotalSimTime(5.0f)
+Simulation::Simulation()
+	:TotalSimTime(5.0f)
 	,DeltaTime(0.05f)
 	,mQuadTarget(nullptr)
+	,mFlightController(nullptr)
 {
 }
 
@@ -27,18 +29,25 @@ void Simulation::SetQuadTarget(Quad* quad)
 	mQuadTarget = quad;
 }
 
+void Simulation::SetFlightController(QuadFlyController* fc)
+{
+	mFlightController = fc;
+}
+
 void Simulation::RenderUI()
 {
-	ImGui::Begin("Simulation");
 	ImGui::InputFloat("Total Simulation Time", &TotalSimTime);
 	ImGui::InputFloat("Delta Time", &DeltaTime);
 	int numberSteps = TotalSimTime / DeltaTime;
 	ImGui::Text("Total Simulation Steps: %i", numberSteps);
-	ImGui::End();
 
 	if (mQuadTarget)
 	{
-		mQuadTarget->RenderUI();
+		if (ImGui::TreeNode("Quad"))
+		{
+			mQuadTarget->RenderUI();
+			ImGui::TreePop();
+		}
 	}
 }
 
@@ -65,7 +74,7 @@ void Simulation::RunSimulation()
 	quadInitialTransform.p = PxVec3(0.0f, 0.0f, 0.0f);
 	quadInitialTransform.q = PxQuat(0.0f, 0.0f, 0.0f, 1.0f);
 	auto rigidBody = physx->createRigidDynamic(quadInitialTransform);
-	rigidBody->setMass(0.25f);
+	rigidBody->setMass(mQuadTarget->Mass);
 
 	physxScene->addActor(*rigidBody);
 
@@ -77,15 +86,25 @@ void Simulation::RunSimulation()
 		// Advance sim:
 		mQuadTarget->Position.y = rigidBody->getGlobalPose().p.y;
 
-		// Query sim state:
+		// FC, run current iteration:
+		FCQuadState fcState;
+		fcState.DeltaTime = DeltaTime;
+		fcState.Height = mQuadTarget->Position.y;
+		FCCommands fcCommands = mFlightController->Iterate(fcState);
+
+		// Apply quad commands
+		float tmpForce = fcCommands.FrontLeftThr * 4.0f; // 4.0Newtowns max force?
+		rigidBody->addForce(PxVec3(0.0f, tmpForce, 0.0f),PxForceMode::eFORCE);
+
+		// Query sim state, used for the 3D visualization:
 		frame.QuadOrientation = mQuadTarget->Orientation;
 		frame.QuadPosition = mQuadTarget->Position;
-
-		curTime += DeltaTime;
 
 		// Step the physx simulation:
 		physxScene->simulate(DeltaTime);
 		physxScene->fetchResults(true);
+
+		curTime += DeltaTime;
 	}
 }
 

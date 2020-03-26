@@ -6,6 +6,7 @@
 #include "Graphics/World/Actor.h"
 #include "Graphics/World/Model.h"
 #include "Graphics/World/TransformComponent.h"
+#include "Graphics/World/ProbeComponent.h"
 #include "Graphics/UI/IMGUI/imgui.h"
 #include "Graphics/Platform/BaseWindow.h"
 
@@ -34,14 +35,21 @@ void QuadExplorerApp::Init()
 	// Setup simulation and quad:
 	mSimulation.Init();
 	mSimulation.SetQuadTarget(&mQuad);
+	mSimulation.SetFlightController(&mFlyController);
 
 	// Setup visualization:
 	mCubeModel = Graphics::ModelFactory::Get()->LoadFromFile("assets:Meshes/cube.obj", mGraphicsInterface);
-	
+	glm::mat3 rot = glm::rotate(glm::mat4(), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	mQuadModel = Graphics::ModelFactory::Get()->LoadFromFile("assets:Meshes/QuadDrone.FBX", mGraphicsInterface, rot);
+
 	mQuadActor = mScene.SpawnActor();
 	mQuadActor->AddComponent<World::TransformComponent>();
-	mQuadActor->AddComponent<World::ModelComponent>()->SetModel(mCubeModel);
+	mQuadActor->AddComponent<World::ModelComponent>()->SetModel(mQuadModel);
 
+	// Add a default probe:
+	mScene.SpawnActor()->AddComponent<World::ProbeComponent>();
+
+	// Setup a camera to render the visualization:
 	float aspect = (float)mWindow->GetWidth() / (float)mWindow->GetHeight();
 	mSimCamera = mScene.SpawnActor();
 	mSimCamera->AddComponent<World::TransformComponent>();
@@ -98,27 +106,40 @@ void QuadExplorerApp::Release()
 
 void QuadExplorerApp::RenderUI()
 {
-	ImGui::Begin("Quad Explorer");
+	bool t = 1;
+	ImGui::ShowDemoWindow(&t);
 
-	if (ImGui::Button("Run Simulation"))
+	// Render all the UI to show and tweak values:
+	ImGui::Begin("Quad Explorer");
 	{
-		mSimulation.RunSimulation();
-	}
-	ImGui::Checkbox("Loop Visualization", &mLoopVisualization);
-	if (mLoopVisualization)
-	{
-		// uh
-	}
-	else
-	{
-		ImGui::SliderInt("Sim Frame", &mOverrideSimFrameIndex, 0, mSimulation.GetNumFrames()-1);
+		if (ImGui::Button("Run Simulation"))
+		{
+			mSimulation.RunSimulation();
+		}
+		ImGui::Checkbox("Loop Visualization", &mLoopVisualization);
+		if (mLoopVisualization)
+		{
+			ImGui::Text("%f/%f", mCurTime, mSimulation.TotalSimTime);
+		}
+		else
+		{
+			ImGui::SliderInt("Sim Frame", &mOverrideSimFrameIndex, 0, mSimulation.GetNumFrames() - 1);
+		}
+
+		float t[] = { -1, 0, 1, 0, -1 ,0 };
+		ImGui::PlotLines("Test", t, 6,0,0,-1,1);
+
+		// Display simulation UI (this will also show quad UI)
+		if (ImGui::CollapsingHeader("Simulation"))
+		{
+			mSimulation.RenderUI();
+		}
+		if (ImGui::CollapsingHeader("Fly Controller"))
+		{
+			mFlyController.RenderUI();
+		}
 	}
 	ImGui::End();
-
-	// Display sim UI (this will also show quad UI)
-	mSimulation.RenderUI();
-
-	mFlyController.RenderUI();
 }
 
 QuadExplorerApp app;

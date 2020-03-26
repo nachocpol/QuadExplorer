@@ -19,9 +19,15 @@ class PID
 {
 public:
 	float Get(float error, float deltaTime);
-	float KP = 0.1f;
+	void Reset();
+	void RenderUI();
+	float KP = 0.9f;
 	float KI = 0.0f;
-	float KD = 0.0f;
+	float KD = 0.1f;
+
+private:
+	bool mFirst = true;
+	float mPrevError = 0.0f;
 };
 
 class QuadFlyController

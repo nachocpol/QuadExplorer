@@ -43,4 +43,5 @@ private:
 	World::Actor* mQuadActor;
 	World::Actor* mSimCamera;
 	Graphics::Model* mCubeModel;
+	Graphics::Model* mQuadModel;
 };

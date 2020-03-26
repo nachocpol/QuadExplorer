@@ -6,6 +6,7 @@
 #include <vector>
 
 class Quad;
+class QuadFlyController;
 
 struct SimulationFrame
 {
@@ -25,6 +26,7 @@ public:
 	Simulation();
 	void Init();
 	void SetQuadTarget(Quad* quad);
+	void SetFlightController(QuadFlyController* fc);
 	void RenderUI();
 	void RunSimulation();
 	SimulationFrame GetSimulationFrame(float simTime);
@@ -38,4 +40,5 @@ public:
 private:
 	SimulationResult mResult;
 	Quad* mQuadTarget;
+	QuadFlyController* mFlightController;
 };
