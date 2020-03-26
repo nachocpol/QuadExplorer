@@ -21,7 +21,7 @@ public:
 	float Get(float error, float deltaTime);
 	void Reset();
 	void RenderUI();
-	float KP = 0.9f;
+	float KP = 1.9f;
 	float KI = 0.0f;
 	float KD = 0.1f;
 

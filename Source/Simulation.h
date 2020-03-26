@@ -31,6 +31,7 @@ public:
 	void RunSimulation();
 	SimulationFrame GetSimulationFrame(float simTime);
 	SimulationFrame GetSimulationFrameFromIdx(int index);
+	const SimulationResult& GetSimulationResults()const;
 	bool HasResults()const;
 	int GetNumFrames();
 

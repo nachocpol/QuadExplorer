@@ -126,8 +126,20 @@ void QuadExplorerApp::RenderUI()
 			ImGui::SliderInt("Sim Frame", &mOverrideSimFrameIndex, 0, mSimulation.GetNumFrames() - 1);
 		}
 
-		float t[] = { -1, 0, 1, 0, -1 ,0 };
-		ImGui::PlotLines("Test", t, 6,0,0,-1,1);
+		bool simReady = mSimulation.HasResults();
+		if (simReady)
+		{
+			// test plot h
+			ImGui::PlotLines("Height", [](void* data, int idx) 
+			{
+				const SimulationResult* results = (const SimulationResult*)data;
+				if (!results)
+				{
+					return 0.0f;
+				}
+				return results->Frames[idx].QuadPosition.y;
+			}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 256));
+		}
 
 		// Display simulation UI (this will also show quad UI)
 		if (ImGui::CollapsingHeader("Simulation"))

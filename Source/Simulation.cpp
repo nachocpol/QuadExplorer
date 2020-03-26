@@ -120,6 +120,11 @@ SimulationFrame Simulation::GetSimulationFrameFromIdx(int index)
 	return mResult.Frames[index];
 }
 
+const SimulationResult& Simulation::GetSimulationResults() const
+{
+	return mResult;
+}
+
 bool Simulation::HasResults() const
 {
 	return !mResult.Frames.empty();
