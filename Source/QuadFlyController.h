@@ -12,18 +12,26 @@ struct FCCommands
 struct FCQuadState
 {
 	float Height;
+	float Pitch;
+	float Yaw;
+	float Roll;
 	float DeltaTime;
 };
 
 class PID
 {
 public:
+	PID(float kp, float ki, float kd);
 	float Get(float error, float deltaTime);
 	void Reset();
 	void RenderUI();
-	float KP = 1.9f;
-	float KI = 0.0f;
-	float KD = 0.1f;
+	float KP;
+	float KI;
+	float KD;
+
+	float LastP;
+	float LastI;
+	float LastD;
 
 private:
 	bool mFirst = true;
@@ -35,8 +43,13 @@ class QuadFlyController
 public:
 	QuadFlyController();
 	void RenderUI();
+	void Reset();
 	FCCommands Iterate(const FCQuadState& state);
 
 	float HeightSetPoint;
-	PID HeightPID;
+	float PitchSetPoint;
+	float RollSetPoint;
+	PID HeightPID = PID(1.3f,0.0f,0.4f);
+	PID PitchPID = PID(0.6f, 0.0f, 0.05f);
+	PID RollPID = PID(0.6f, 0.0f, 0.05f);
 };

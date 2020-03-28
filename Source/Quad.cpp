@@ -18,5 +18,5 @@ void Quad::RenderUI()
 void Quad::Reset()
 {
 	Position = glm::vec3(0.0f);
-	Orientation = glm::quat();
+	Orientation = glm::vec3(0.0f);
 }

@@ -17,5 +17,5 @@ public:
 
 	// The simulation will drive this values
 	glm::vec3 Position;
-	glm::quat Orientation;
+	glm::vec3 Orientation;
 };

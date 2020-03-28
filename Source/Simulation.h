@@ -10,12 +10,30 @@ class QuadFlyController;
 
 struct SimulationFrame
 {
+	struct PIDState
+	{
+		float P;
+		float I;
+		float D;
+	};
+	enum PIDType
+	{
+		Height,
+		Pitch,
+		Roll
+	};
+	const PIDState& GetPIDState(PIDType type)const;
 	glm::vec3 QuadPosition;
-	glm::quat QuadOrientation;
+	glm::vec3 QuadOrientation;
+	glm::vec3 WorldForce;
+	PIDState HeightPIDState;
+	PIDState PitchPIDState;
+	PIDState RollPIDState;
 };
 
 struct SimulationResult
 {
+	void Reset();
 	float DeltaTime;
 	std::vector<SimulationFrame> Frames;
 };

@@ -9,6 +9,7 @@
 #include "Graphics/World/ProbeComponent.h"
 #include "Graphics/UI/IMGUI/imgui.h"
 #include "Graphics/Platform/BaseWindow.h"
+#include "Graphics/DebugDraw.h"
 
 QuadExplorerApp::QuadExplorerApp():
 	 mCurTime(0.0f)
@@ -86,11 +87,8 @@ void QuadExplorerApp::Update()
 		}
 
 		mQuadActor->Transform->SetPosition(simFrame.QuadPosition);
-
-		// Display cur frame info:
-		ImGui::Begin("Quad Explorer");
-		ImGui::Text("Position x=%.3f y=%.3f z=%.3f", simFrame.QuadPosition.x, simFrame.QuadPosition.y, simFrame.QuadPosition.z);
-		ImGui::End();
+		mQuadActor->Transform->SetRotation(simFrame.QuadOrientation);
+		Graphics::DebugDraw::GetInstance()->DrawLine(simFrame.QuadPosition, simFrame.QuadPosition + glm::normalize(simFrame.WorldForce));
 	}
 
 
@@ -115,6 +113,14 @@ void QuadExplorerApp::RenderUI()
 		if (ImGui::Button("Run Simulation"))
 		{
 			mSimulation.RunSimulation();
+			mCurTime = 0.0f;
+			mOverrideSimFrameIndex = 0;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset"))
+		{
+			mCurTime = 0.0f;
+			mOverrideSimFrameIndex = 0;
 		}
 		ImGui::Checkbox("Loop Visualization", &mLoopVisualization);
 		if (mLoopVisualization)
@@ -129,16 +135,108 @@ void QuadExplorerApp::RenderUI()
 		bool simReady = mSimulation.HasResults();
 		if (simReady)
 		{
-			// test plot h
-			ImGui::PlotLines("Height", [](void* data, int idx) 
+			ImGui::Begin("Plotting");
+			if (ImGui::CollapsingHeader("General"))
 			{
-				const SimulationResult* results = (const SimulationResult*)data;
-				if (!results)
+				// Plot height
+				ImGui::PlotLines("Height", [](void* data, int idx) 
 				{
-					return 0.0f;
+					const SimulationResult* results = (const SimulationResult*)data;
+					if (!results)
+					{
+						return 0.0f;
+					}
+					return results->Frames[idx].QuadPosition.y;
+				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+
+				// Plot pitch
+				ImGui::PlotLines("Pitch", [](void* data, int idx)
+				{
+					const SimulationResult* results = (const SimulationResult*)data;
+					if (!results)
+					{
+						return 0.0f;
+					}
+					return results->Frames[idx].QuadOrientation.x;
+				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+
+				// Plot roll
+				ImGui::PlotLines("Roll", [](void* data, int idx)
+				{
+					const SimulationResult* results = (const SimulationResult*)data;
+					if (!results)
+					{
+						return 0.0f;
+					}
+					return results->Frames[idx].QuadOrientation.z;
+				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+			}
+			if (ImGui::CollapsingHeader("PID"))
+			{
+				struct PIDDATA
+				{
+					const SimulationResult* Results;
+					SimulationFrame::PIDType Type;
+				};
+
+				auto plotPID_P = [this](const char* label, PIDDATA data) {
+					ImGui::PlotLines(label, [](void* data, int idx)
+					{
+						const PIDDATA* pData = (const PIDDATA*)data;
+						if (!pData)
+						{
+							return 0.0f;
+						}
+						return pData->Results->Frames[idx].GetPIDState(pData->Type).P;
+					}, (void*)&data, mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+				};
+				auto plotPID_I = [this](const char* label, PIDDATA data) {
+					ImGui::PlotLines(label, [](void* data, int idx)
+					{
+						const PIDDATA* pData = (const PIDDATA*)data;
+						if (!pData)
+						{
+							return 0.0f;
+						}
+						return pData->Results->Frames[idx].GetPIDState(pData->Type).I;
+					}, (void*)&data, mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+				};
+				auto plotPID_D = [this](const char* label, PIDDATA data) {
+					ImGui::PlotLines(label, [](void* data, int idx)
+					{
+						const PIDDATA* pData = (const PIDDATA*)data;
+						if (!pData)
+						{
+							return 0.0f;
+						}
+						return pData->Results->Frames[idx].GetPIDState(pData->Type).D;
+					}, (void*)&data, mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+				};
+
+				PIDDATA dat = { &mSimulation.GetSimulationResults(), SimulationFrame::PIDType::Height };
+				if (ImGui::CollapsingHeader("Height"))
+				{
+					plotPID_P("P", dat);
+					//plotPID_I("I", dat);
+					plotPID_D("D", dat);
 				}
-				return results->Frames[idx].QuadPosition.y;
-			}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 256));
+				dat.Type = SimulationFrame::Pitch;
+				if (ImGui::CollapsingHeader("Pitch"))
+				{
+					plotPID_P("P", dat);
+					//plotPID_I("I", dat);
+					plotPID_D("D", dat);
+				}
+				dat.Type = SimulationFrame::Roll;
+				if (ImGui::CollapsingHeader("Roll"))
+				{
+					plotPID_P("P", dat);
+					//plotPID_I("I", dat);
+					plotPID_D("D", dat);
+				}
+			}
+
+			ImGui::End();
 		}
 
 		// Display simulation UI (this will also show quad UI)
