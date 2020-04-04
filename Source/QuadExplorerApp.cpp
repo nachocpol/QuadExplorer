@@ -10,6 +10,7 @@
 #include "Graphics/UI/IMGUI/imgui.h"
 #include "Graphics/Platform/BaseWindow.h"
 #include "Graphics/DebugDraw.h"
+#include "Core/Logging.h"
 
 QuadExplorerApp::QuadExplorerApp()
 	:mCurTime(0.0f)
@@ -64,6 +65,17 @@ void QuadExplorerApp::Update()
 {
 	AppBase::Update();
 
+	// Query coms:
+	{
+		char data[128];
+		int readBytes = mSerialCom.ReadBytes(data, 128);
+		if (readBytes > 0)
+		{
+			data[readBytes] = 0;
+			INFO(data);
+		}
+	}
+
 	// Render main config UI (also Quad and Sim UI):
 	RenderUI();
 
@@ -106,8 +118,10 @@ void QuadExplorerApp::Release()
 
 void QuadExplorerApp::RenderUI()
 {
-	//bool t = 1;
-	//ImGui::ShowDemoWindow(&t);
+	bool t = 1;
+	ImGui::ShowDemoWindow(&t);
+
+	mSerialCom.RenderUI();
 
 	// Render all the UI to show and tweak values:
 	ImGui::Begin("Quad Explorer");

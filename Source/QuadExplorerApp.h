@@ -7,6 +7,7 @@
 #include "Simulation.h"
 #include "Quad.h"
 #include "QuadFlyController.h"
+#include "Coms/SerialCom.h"
 
 namespace World
 {
@@ -46,4 +47,7 @@ private:
 	World::Actor* mSimCamera;
 	Graphics::Model* mCubeModel;
 	Graphics::Model* mQuadModel;
+
+	// Serial coms
+	SerialCom mSerialCom;
 };
