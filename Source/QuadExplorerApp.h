@@ -36,7 +36,9 @@ private:
 	Quad mQuad;
 	QuadFlyController mFlyController;
 	float mCurTime;
+	float mVisualizationSpeed;
 	bool mLoopVisualization;
+	bool mInterpolateFrames;
 	int mOverrideSimFrameIndex;
 
 	// Visualization:

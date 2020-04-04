@@ -176,11 +176,25 @@ void Simulation::RunSimulation()
 	physxScene->release();
 }
 
-SimulationFrame Simulation::GetSimulationFrame(float simTime)
+SimulationFrame Simulation::GetSimulationFrame(float simTime, bool interpolate)
 {
-	// TO-DO: implement interpolation
-	int index = (int)((simTime / TotalSimTime) * (float)mResult.Frames.size());
-	return mResult.Frames[index];
+	float fIndex = (simTime / TotalSimTime) * (float)mResult.Frames.size();
+
+	if (interpolate)
+	{
+		int nextFrameIdx = (int)ceil(fIndex);
+		int prevFrameIdx = (int)floor(fIndex);
+		if (nextFrameIdx != prevFrameIdx && nextFrameIdx < mResult.Frames.size())
+		{
+			const SimulationFrame& prevFrame = mResult.Frames[prevFrameIdx];
+			const SimulationFrame& nextFrame = mResult.Frames[nextFrameIdx];
+			float delta = nextFrameIdx - fIndex;
+			return SimulationFrame::Interpolate(prevFrame, nextFrame, 1.0f - delta);
+		}
+		// else fall back to no interpolation.
+	}
+
+	return mResult.Frames[(int)fIndex];
 }
 
 SimulationFrame Simulation::GetSimulationFrameFromIdx(int index)
@@ -222,4 +236,20 @@ const SimulationFrame::PIDState& SimulationFrame::GetPIDState(PIDType type)const
 		case SimulationFrame::Roll:		return RollPIDState;
 		default: assert(false);			return HeightPIDState;
 	}
+}
+
+SimulationFrame SimulationFrame::Interpolate(const SimulationFrame& a, const SimulationFrame& b, float alpha)
+{
+	SimulationFrame newFrame;
+
+	newFrame.QuadPosition = glm::lerp(a.QuadPosition, b.QuadPosition, alpha);
+	newFrame.QuadOrientation = glm::lerp(a.QuadOrientation, b.QuadOrientation, alpha);
+	newFrame.WorldForce = glm::lerp(a.WorldForce, b.WorldForce, alpha);
+	
+	//TO-DO
+	newFrame.HeightPIDState = a.HeightPIDState;
+	newFrame.PitchPIDState = a.PitchPIDState;
+	newFrame.RollPIDState = a.RollPIDState;
+
+	return newFrame;
 }

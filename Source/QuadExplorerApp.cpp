@@ -11,10 +11,12 @@
 #include "Graphics/Platform/BaseWindow.h"
 #include "Graphics/DebugDraw.h"
 
-QuadExplorerApp::QuadExplorerApp():
-	 mCurTime(0.0f)
+QuadExplorerApp::QuadExplorerApp()
+	:mCurTime(0.0f)
 	,mLoopVisualization(true)
+	,mInterpolateFrames(true)
 	,mOverrideSimFrameIndex(0)
+	,mVisualizationSpeed(1.0f)
 {
 }
 
@@ -73,13 +75,13 @@ void QuadExplorerApp::Update()
 		if (mLoopVisualization)
 		{
 			// Sim time:
-			mCurTime += DeltaTime;
+			mCurTime += DeltaTime * mVisualizationSpeed;
 			if (mCurTime > mSimulation.TotalSimTime)
 			{
 				mCurTime = 0.0f;
 			}
 			// Get simulation frame:
-			simFrame = mSimulation.GetSimulationFrame(mCurTime);
+			simFrame = mSimulation.GetSimulationFrame(mCurTime, mInterpolateFrames);
 		}
 		else
 		{
@@ -104,8 +106,8 @@ void QuadExplorerApp::Release()
 
 void QuadExplorerApp::RenderUI()
 {
-	bool t = 1;
-	ImGui::ShowDemoWindow(&t);
+	//bool t = 1;
+	//ImGui::ShowDemoWindow(&t);
 
 	// Render all the UI to show and tweak values:
 	ImGui::Begin("Quad Explorer");
@@ -126,11 +128,14 @@ void QuadExplorerApp::RenderUI()
 		if (mLoopVisualization)
 		{
 			ImGui::Text("%f/%f", mCurTime, mSimulation.TotalSimTime);
+			ImGui::SliderFloat("Playback Speed", &mVisualizationSpeed, 0.0f, 2.0f);
 		}
 		else
 		{
 			ImGui::SliderInt("Sim Frame", &mOverrideSimFrameIndex, 0, mSimulation.GetNumFrames() - 1);
 		}
+		ImGui::Checkbox("Interpolate Frames", &mInterpolateFrames);
+		ImGui::Separator();
 
 		bool simReady = mSimulation.HasResults();
 		if (simReady)
@@ -147,7 +152,7 @@ void QuadExplorerApp::RenderUI()
 						return 0.0f;
 					}
 					return results->Frames[idx].QuadPosition.y;
-				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, -1.0f, 5.0f, ImVec2(512, 128));
 
 				// Plot pitch
 				ImGui::PlotLines("Pitch", [](void* data, int idx)
@@ -157,8 +162,8 @@ void QuadExplorerApp::RenderUI()
 					{
 						return 0.0f;
 					}
-					return results->Frames[idx].QuadOrientation.x;
-				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+					return glm::degrees(results->Frames[idx].QuadOrientation.x);
+				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0,-60, 60.0f, ImVec2(512, 128));
 
 				// Plot roll
 				ImGui::PlotLines("Roll", [](void* data, int idx)
@@ -168,8 +173,8 @@ void QuadExplorerApp::RenderUI()
 					{
 						return 0.0f;
 					}
-					return results->Frames[idx].QuadOrientation.z;
-				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, FLT_MAX, FLT_MAX, ImVec2(512, 128));
+					return glm::degrees(results->Frames[idx].QuadOrientation.z);
+				}, (void*)&mSimulation.GetSimulationResults(), mSimulation.GetNumFrames(), 0, 0, -60.0f, 60.0f, ImVec2(512, 128));
 			}
 			if (ImGui::CollapsingHeader("PID"))
 			{

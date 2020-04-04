@@ -23,6 +23,7 @@ struct SimulationFrame
 		Roll
 	};
 	const PIDState& GetPIDState(PIDType type)const;
+	static SimulationFrame Interpolate(const SimulationFrame& a, const SimulationFrame& b, float alpha);
 	glm::vec3 QuadPosition;
 	glm::vec3 QuadOrientation;
 	glm::vec3 WorldForce;
@@ -47,7 +48,7 @@ public:
 	void SetFlightController(QuadFlyController* fc);
 	void RenderUI();
 	void RunSimulation();
-	SimulationFrame GetSimulationFrame(float simTime);
+	SimulationFrame GetSimulationFrame(float simTime, bool interpolate = true);
 	SimulationFrame GetSimulationFrameFromIdx(int index);
 	const SimulationResult& GetSimulationResults()const;
 	bool HasResults()const;
