@@ -45,6 +45,7 @@ private:
 	// Visualization:
 	World::Actor* mQuadActor;
 	World::Actor* mSimCamera;
+	World::Actor* mGroundActor;
 	Graphics::Model* mCubeModel;
 	Graphics::Model* mQuadModel;
 

@@ -47,8 +47,15 @@ void QuadExplorerApp::Init()
 	mQuadModel = Graphics::ModelFactory::Get()->LoadFromFile("assets:Meshes/QuadDrone.FBX", mGraphicsInterface, rot);
 
 	mQuadActor = mScene.SpawnActor();
-	mQuadActor->AddComponent<World::TransformComponent>();
-	mQuadActor->AddComponent<World::ModelComponent>()->SetModel(mQuadModel);
+	mQuadActor->AddComponent<World::TransformComponent>()->SetScale(mQuad.Width,mQuad.Height,mQuad.Depth);
+	mQuadActor->AddComponent<World::ModelComponent>()->SetModel(mCubeModel);
+
+
+	mGroundActor = mScene.SpawnActor();
+	auto groundTransform = mGroundActor->AddComponent<World::TransformComponent>();
+	groundTransform->SetScale(15.0f, 0.01f, 15.0f);
+	groundTransform->SetPosition(0.0, -0.35f, 0.0f);
+	mGroundActor->AddComponent<World::ModelComponent>()->SetModel(mCubeModel);
 
 	// Add a default probe:
 	mScene.SpawnActor()->AddComponent<World::ProbeComponent>();
@@ -64,6 +71,10 @@ void QuadExplorerApp::Init()
 void QuadExplorerApp::Update()
 {
 	AppBase::Update();
+
+	// Future BT:
+	// https://docs.microsoft.com/es-es/windows/win32/bluetooth/bluetooth-start-page
+
 
 	// Query coms:
 	{

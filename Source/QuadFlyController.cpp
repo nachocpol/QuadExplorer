@@ -63,7 +63,7 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state)
 
 	commands.FrontLeftThr = heightAction - rollAction - pitchAction;
 	commands.RearLeftThr = heightAction - rollAction + pitchAction;
-
+	
 	commands.FrontRightThr = heightAction + rollAction - pitchAction;
 	commands.RearRightThr = heightAction + rollAction + pitchAction;
 

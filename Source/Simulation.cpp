@@ -9,6 +9,7 @@
 
 #include "PxPhysicsAPI.h"
 #include "PxFiltering.h"
+#include "PxSceneDesc.h"
 #include "extensions/PxRigidBodyExt.h"
 
 #include "glm/ext.hpp"
@@ -72,38 +73,46 @@ void Simulation::RunSimulation()
 	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
 	sceneDesc.cpuDispatcher = World::PhysicsWorld::GetInstance()->GetPhyxCPUDispatcher();
 	sceneDesc.filterShader = PxDefaultSimulationFilterShader;
+	sceneDesc.solverType = PxSolverType::eTGS;
+	sceneDesc.flags.set(PxSceneFlag::eENABLE_CCD);
+	sceneDesc.bounceThresholdVelocity = 10.0f * 9.81f;
+	sceneDesc.ccdMaxPasses = 4;
 	PxScene* physxScene = physx->createScene(sceneDesc);
 
-	// Quad rigidbody:
+	// Quad rigid body:
 	PxTransform quadInitialTransform;
 	quadInitialTransform.p = PxVec3(0.0f, 0.0f, 0.0f);
-	glm::quat initialQuat = glm::quat(glm::vec3(glm::radians(20.0f),0.0f,0.0f));
+	glm::quat initialQuat = glm::quat(glm::vec3(glm::radians(0.0f),0.0f,0.0f));
 	quadInitialTransform.q = PxQuat(initialQuat.x, initialQuat.y, initialQuat.z, initialQuat.w);
 	auto rigidBody = physx->createRigidDynamic(quadInitialTransform);
 	rigidBody->setMass(mQuadTarget->Mass);
 
-	// Shape
-	float dimX = 0.2f;
-	float dimY = 0.05f;
-	float dimZ = 0.2f;
-
-	PxMaterial* quadMat = physx->createMaterial(0.0f, 0.0f, 1.0f);
-	PxShape* quadBox = physx->createShape(PxBoxGeometry(dimX, dimY, dimZ), *quadMat);
+	PxMaterial* quadMat = physx->createMaterial(0.5f, 0.5f, 0.0f);
+	PxShape* quadBox = physx->createShape(PxBoxGeometry(mQuadTarget->Width * 0.5f, mQuadTarget->Height * 0.5f, mQuadTarget->Depth * 0.5f), *quadMat);
 	rigidBody->attachShape(*quadBox);
 
-	float density = mQuadTarget->Mass / (dimX * 2.0f * dimZ * 2.0f * dimY * 2.0f);
+	float density = mQuadTarget->Mass / (mQuadTarget->Width * mQuadTarget->Height * mQuadTarget->Depth);
 	auto tensor = rigidBody->getMassSpaceInertiaTensor();
 	PxRigidBodyExt::updateMassAndInertia(*rigidBody, density);
 	tensor = rigidBody->getMassSpaceInertiaTensor();
 
-	float checkmass = rigidBody->getMass();
-
 	physxScene->addActor(*rigidBody);
 
+	// Ground plane
+	auto plane = PxCreatePlane(*physx, PxPlane(0.0f, 1.0f, 0.0f, 0.2f), *quadMat);
+	physxScene->addActor(*plane);
+
+#if 0
 	float rnd1 = 0.2f;
 	float rnd2 = -0.375f;
 	float rnd3 = 0.33f;
 	float rnd4 = -0.3f;
+#else
+	float rnd1 = 0.0f;
+	float rnd2 = 0.0f;
+	float rnd3 = 0.0f;
+	float rnd4 = 0.0f;
+#endif
 
 	// Run each simulation step:
 	for (int frameIdx = 0; frameIdx < numSimFrames; ++frameIdx)
@@ -129,6 +138,8 @@ void Simulation::RunSimulation()
 		quadToWorld = glm::rotate(quadToWorld, mQuadTarget->Orientation.z, glm::vec3(0.0f, 0.0f, 1.0f));
 		
 		// Thrust per motor:
+		float dimX = mQuadTarget->Width * 0.5f;
+		float dimZ = mQuadTarget->Depth * 0.5f;
 		float flThrust = glm::clamp(fcCommands.FrontLeftThr, 0.0f, 1.0f) * (1.5f + rnd1);
 		PxRigidBodyExt::addLocalForceAtLocalPos(*rigidBody, PxVec3(0.0f, flThrust, 0.0f), PxVec3(-dimX, 0.0f, dimZ));
 
@@ -172,6 +183,7 @@ void Simulation::RunSimulation()
 	}
 
 	// Cleanup:
+	plane->release();
 	rigidBody->release();
 	physxScene->release();
 }

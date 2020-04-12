@@ -4,15 +4,18 @@
 
 Quad::Quad():
 	 Mass(0.2f)
-	,Width(0.25f)
+	,Width(0.16f)
 	,Height(0.05f)
-	,Depth(0.25f)
+	,Depth(0.16f)
 {
 }
 
 void Quad::RenderUI()
 {
 	ImGui::InputFloat("Mass", &Mass);
+	ImGui::InputFloat("Width", &Width);
+	ImGui::InputFloat("Height", &Height);
+	ImGui::InputFloat("Depth", &Depth);
 }
 
 void Quad::Reset()
