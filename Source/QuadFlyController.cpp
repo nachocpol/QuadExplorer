@@ -2,9 +2,8 @@
 #include "Graphics/UI/IMGUI/imgui.h"
 
 QuadFlyController::QuadFlyController()
-	:HeightSetPoint(1.5f)
-	,RollSetPoint(0.0f)
 {
+	Reset();
 }
 
 void QuadFlyController::RenderUI()
@@ -31,6 +30,12 @@ void QuadFlyController::RenderUI()
 
 void QuadFlyController::Reset()
 {
+	mReachedTop = false;
+	mCountDown = 2.0f;
+	HeightSetPoint = 1.5f;
+	RollSetPoint = 0.0f;
+	mState = State::Initial;
+
 	HeightPID.Reset();
 	PitchPID.Reset();
 	RollPID.Reset();
@@ -40,8 +45,78 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state)
 {
 	FCCommands commands = {};
 
+	bool runPID = false;
+
+	switch (mState)
+	{
+		case State::Initial:
+		{
+			if (state.Time > 3.0f)
+			{
+				mState = State::Climbing;
+			}
+			break;
+		}
+
+		case State::Climbing:
+		{
+			runPID = true;
+
+			if (!mReachedTop)
+			{
+				float targetThreshold = 0.35f; // Reached target if within 10cm
+				if ((HeightSetPoint - state.Height) <= targetThreshold)
+				{
+					mReachedTop = true;
+				}
+			}
+			else
+			{
+				mCountDown -= state.DeltaTime;
+				if (mCountDown <= 0.0f)
+				{
+					mState = State::Descending;
+				}
+			}
+			break;
+		}
+
+		case State::Descending:
+		{
+			runPID = true;
+
+			if (HeightSetPoint > 0.0f)
+			{
+				HeightSetPoint -= 0.20f * state.DeltaTime; // Descend at 20cm per second
+			}
+
+			if (state.Height <= 0.1f)
+			{
+				mState = State::Done;
+			}
+
+			break;
+		}
+
+		case State::Done:
+		{
+			runPID = false;
+
+			break;
+		}
+
+		case State::FailSafe:
+		default:
+		{
+			runPID = false;
+
+			break;
+		}
+	}
+
 	// Height PID
 	float heightAction = 0.0f;
+	if(runPID)
 	{
 		float heightError = HeightSetPoint - state.Height;
 		heightAction = HeightPID.Get(heightError, state.DeltaTime);
@@ -49,6 +124,7 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state)
 
 	// Pitch PID
 	float pitchAction = 0.0f;
+	if (runPID)
 	{
 		float pitchError = PitchSetPoint - state.Pitch;
 		pitchAction = PitchPID.Get(pitchError, state.DeltaTime);
@@ -56,6 +132,7 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state)
 
 	// Roll PID
 	float rollAction = 0.0f;
+	if (runPID)
 	{
 		float rollError = RollSetPoint - state.Roll;
 		rollAction = RollPID.Get(rollError, state.DeltaTime);

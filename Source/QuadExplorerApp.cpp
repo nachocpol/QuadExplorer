@@ -50,7 +50,6 @@ void QuadExplorerApp::Init()
 	mQuadActor->AddComponent<World::TransformComponent>()->SetScale(mQuad.Width,mQuad.Height,mQuad.Depth);
 	mQuadActor->AddComponent<World::ModelComponent>()->SetModel(mCubeModel);
 
-
 	mGroundActor = mScene.SpawnActor();
 	auto groundTransform = mGroundActor->AddComponent<World::TransformComponent>();
 	groundTransform->SetScale(15.0f, 0.01f, 15.0f);
@@ -157,6 +156,7 @@ void QuadExplorerApp::RenderUI()
 		}
 		else
 		{
+			ImGui::Text("%f/%f", mOverrideSimFrameIndex * mSimulation.DeltaTime, mSimulation.TotalSimTime);
 			ImGui::SliderInt("Sim Frame", &mOverrideSimFrameIndex, 0, mSimulation.GetNumFrames() - 1);
 		}
 		ImGui::Checkbox("Interpolate Frames", &mInterpolateFrames);

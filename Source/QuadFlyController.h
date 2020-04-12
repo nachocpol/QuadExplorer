@@ -16,6 +16,7 @@ struct FCQuadState
 	float Yaw;
 	float Roll;
 	float DeltaTime;
+	float Time;
 };
 
 class PID
@@ -50,6 +51,22 @@ public:
 	float PitchSetPoint;
 	float RollSetPoint;
 	PID HeightPID = PID(1.3f,0.0f,0.4f);
-	PID PitchPID = PID(0.6f, 0.0f, 0.05f);
-	PID RollPID = PID(0.6f, 0.0f, 0.05f);
+	PID PitchPID = PID(0.6f, 0.0f, 0.02f);
+	PID RollPID = PID(0.6f, 0.0f, 0.02f);
+
+private:
+	struct State
+	{
+		enum T
+		{
+			Initial,
+			Climbing,
+			Descending,
+			Done,
+			FailSafe
+		};
+	};
+	State::T mState;   // State of the flight controller
+	float mCountDown;  // After reaching target altitude, how long to stay before descending
+	bool mReachedTop;
 };

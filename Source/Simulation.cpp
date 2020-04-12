@@ -129,6 +129,7 @@ void Simulation::RunSimulation()
 		fcState.Pitch = mQuadTarget->Orientation.x;
 		fcState.Yaw = mQuadTarget->Orientation.y;
 		fcState.Roll = mQuadTarget->Orientation.z;
+		fcState.Time = curTime;
 		FCCommands fcCommands = mFlightController->Iterate(fcState);
 
 		// Apply quad commands
