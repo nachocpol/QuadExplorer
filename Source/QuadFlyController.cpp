@@ -1,4 +1,5 @@
 #include "QuadFlyController.h"
+#include <cmath>
 #include "Graphics/UI/IMGUI/imgui.h"
 
 QuadFlyController::QuadFlyController()
@@ -46,6 +47,15 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state)
 	FCCommands commands = {};
 
 	bool runPID = false;
+
+	// Check fail safe:
+	if(mState != State::FailSafe)
+	{
+		if (abs(state.Pitch) > 35.0f || abs(state.Roll) > 35.0f)
+		{
+			mState = State::FailSafe;
+		}
+	}
 
 	switch (mState)
 	{

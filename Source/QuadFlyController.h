@@ -9,6 +9,7 @@ struct FCCommands
 	float RearRightThr;
 };
 
+// Units: meters, radians, seconds.
 struct FCQuadState
 {
 	float Height;
@@ -51,8 +52,8 @@ public:
 	float PitchSetPoint;
 	float RollSetPoint;
 	PID HeightPID = PID(1.3f,0.0f,0.4f);
-	PID PitchPID = PID(0.6f, 0.0f, 0.02f);
-	PID RollPID = PID(0.6f, 0.0f, 0.02f);
+	PID PitchPID = PID(0.15f, 0.0f, 0.01f);
+	PID RollPID = PID(0.15f, 0.0f, 0.01f);
 
 private:
 	struct State

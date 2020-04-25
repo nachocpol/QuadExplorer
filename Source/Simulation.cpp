@@ -82,7 +82,7 @@ void Simulation::RunSimulation()
 	// Quad rigid body:
 	PxTransform quadInitialTransform;
 	quadInitialTransform.p = PxVec3(0.0f, 0.0f, 0.0f);
-	glm::quat initialQuat = glm::quat(glm::vec3(glm::radians(0.0f),0.0f,0.0f));
+	glm::quat initialQuat = glm::quat(glm::vec3(glm::radians(20.0f),0.0f,0.0f));
 	quadInitialTransform.q = PxQuat(initialQuat.x, initialQuat.y, initialQuat.z, initialQuat.w);
 	auto rigidBody = physx->createRigidDynamic(quadInitialTransform);
 	rigidBody->setMass(mQuadTarget->Mass);
