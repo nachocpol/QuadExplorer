@@ -13,6 +13,7 @@ filter { "platforms:x64" }
 		"Depen/AwesomeEngine/Depen/GLM",
 		"Depen/AwesomeEngine/Depen/PhysX/physx/include",
 		"Depen/AwesomeEngine/Depen/PhysX/pxshared/include",
+		"Board/lib/QuadFlyController/src"
 	}
 
 filter {"configurations:Debug"}
@@ -46,7 +47,9 @@ project "QuadExplorerApp"
 	files
 	{
 		"Source/**.h",
-		"Source/**.cpp"
+		"Source/**.cpp",
+		"Board/lib/QuadFlyController/**.cpp",
+		"Board/lib/QuadFlyController/**.h"
 	}
 	filter "configurations:Debug"
 		symbols "On"

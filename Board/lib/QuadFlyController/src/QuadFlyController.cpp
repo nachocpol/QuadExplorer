@@ -1,6 +1,11 @@
 #include "QuadFlyController.h"
+
+#ifdef _WIN32 
 #include <cmath>
 #include "Graphics/UI/IMGUI/imgui.h"
+#else
+#include <Arduino.h>
+#endif
 
 QuadFlyController::QuadFlyController()
 {
@@ -9,6 +14,7 @@ QuadFlyController::QuadFlyController()
 
 void QuadFlyController::RenderUI()
 {
+#ifdef _WIN32 
 	if (ImGui::TreeNode("Height PID"))
 	{
 		ImGui::InputFloat("Set Point", &HeightSetPoint);
@@ -27,6 +33,7 @@ void QuadFlyController::RenderUI()
 		RollPID.RenderUI();
 		ImGui::TreePop();
 	}
+#endif
 }
 
 void QuadFlyController::Reset()
@@ -194,8 +201,10 @@ void PID::Reset()
 
 void PID::RenderUI()
 {
+#ifdef _WIN32 
 	ImGui::SliderFloat("KP", &KP, 0.0f, 5.0f);
 	ImGui::SliderFloat("KI", &KI, 0.0f, 5.0f);
 	ImGui::SliderFloat("KD", &KD, 0.0f, 1.0f);
+#endif
 }
 
