@@ -5,3 +5,9 @@ Temp
 Build
 
 *.sln
+
+ControllerApp/Logs
+
+ControllerApp/Temp
+
+ControllerApp/Temp/3rdParty
