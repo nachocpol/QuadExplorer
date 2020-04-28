@@ -10,4 +10,6 @@ ControllerApp/Logs
 
 ControllerApp/Temp
 
-ControllerApp/Temp/3rdParty
+ControllerApp/Library
+
+ControllerApp/Assets/3rdParty
