@@ -3,8 +3,6 @@
 
 #include "QuadFlyController.h"
 
-BLEService g_TestService("180F");
-
 QuadFlyController FC;
 FCQuadState State;
 
@@ -16,25 +14,66 @@ const int k_PinMotor2 = 4;
 const int k_PinMotor3 = 3;
 const int k_PinMotor4 = 2;
 
+BLEDevice g_CentralDevice;
+
 void setup() 
 {
-  delay(5000);
+  Serial.begin(9600);
+  while (!Serial) {}
 
-  analogWrite(k_PinMotor1, 5);
-  analogWrite(k_PinMotor2, 5);
-  analogWrite(k_PinMotor3, 5);
-  analogWrite(k_PinMotor4, 5);
+  if(!BLE.begin())
+  {
+    Serial.println("Failed to begin BLE");
+    while(1);
+  }
 
-  delay(10000);
+  digitalWrite(LED_BUILTIN, HIGH);
+  String bleAddress = BLE.address();
+  Serial.print("Local address is : "); Serial.println(bleAddress);
 
-  analogWrite(k_PinMotor1, 0);
-  analogWrite(k_PinMotor2, 0);
-  analogWrite(k_PinMotor3, 0);
-  analogWrite(k_PinMotor4, 0);
+  BLE.setAdvertisedServiceUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
+  BLE.setLocalName("QuadExplorer");
+  BLE.setDeviceName("ArduinoNanoBLE33");
+
+  BLE.advertise();
+
+  // Wait until the central device connects:
+  while(!g_CentralDevice)
+  {
+    g_CentralDevice = BLE.central();
+    delay(10);
+  }
+
+  Serial.print("We have a central: "); Serial.println(g_CentralDevice.address());
+  if(g_CentralDevice.hasLocalName())
+  {
+    Serial.print("Name: "); Serial.println(g_CentralDevice.localName());
+  }
+  if(!g_CentralDevice.discoverAttributes())
+  {
+    Serial.println("Failed to discover attribs");
+  }
+
+  if(!g_CentralDevice.connect())
+  {
+    Serial.println("Failed to connect to the central device");
+    while(1);
+  }
 }
 
 void loop() 
 {
+  // Check if still connected, this does the poll (with 0ms time out)
+  if(!g_CentralDevice.connected())
+  {
+    Serial.println("Lost connection with central device");
+    while(1);
+  }
+  else
+  {
+    Serial.println(g_CentralDevice.rssi());
+  }
+
   unsigned long startTime = millis();
 
   State.DeltaTime = deltaTime;
