@@ -15,6 +15,8 @@ const int k_PinMotor3 = 3;
 const int k_PinMotor4 = 2;
 
 BLEDevice g_CentralDevice;
+BLEService g_CommandsService("1101");
+BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLERead | BLEWrite);
 
 void setup() 
 {
@@ -31,9 +33,12 @@ void setup()
   String bleAddress = BLE.address();
   Serial.print("Local address is : "); Serial.println(bleAddress);
 
-  BLE.setAdvertisedServiceUuid("19B10000-E8F2-537E-4F6C-D104768A1214");
   BLE.setLocalName("QuadExplorer");
-  BLE.setDeviceName("ArduinoNanoBLE33");
+  BLE.setAdvertisedService(g_CommandsService);
+  g_ThrottleCharacteristic.setValue(12);
+  g_CommandsService.addCharacteristic(g_ThrottleCharacteristic);
+  BLE.addService(g_CommandsService);
+
 
   BLE.advertise();
 
@@ -71,7 +76,11 @@ void loop()
   }
   else
   {
-    Serial.println(g_CentralDevice.rssi());
+    //Serial.println(g_CentralDevice.rssi());
+
+    int32_t val = 0;
+    g_ThrottleCharacteristic.readValue(val);
+    Serial.println(val);
   }
 
   unsigned long startTime = millis();
