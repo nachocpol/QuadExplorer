@@ -16,7 +16,10 @@ const int k_PinMotor4 = 2;
 
 BLEDevice g_CentralDevice;
 BLEService g_CommandsService("1101");
-BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLERead | BLEWrite);
+BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_YawCharacteristic("2203", BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_PitchCharacteristic("2204", BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_RollCharacteristic("2205", BLERead | BLEWriteWithoutResponse);
 
 void setup() 
 {
@@ -33,13 +36,20 @@ void setup()
   String bleAddress = BLE.address();
   Serial.print("Local address is : "); Serial.println(bleAddress);
 
+  // Ensure 0 initialized:
+  g_ThrottleCharacteristic.setValue(0);
+  g_YawCharacteristic.setValue(0);
+  g_PitchCharacteristic.setValue(0);
+  g_RollCharacteristic.setValue(0);
+
+  // Advertise commands service and characteristics:
   BLE.setLocalName("QuadExplorer");
   BLE.setAdvertisedService(g_CommandsService);
-  g_ThrottleCharacteristic.setValue(12);
   g_CommandsService.addCharacteristic(g_ThrottleCharacteristic);
+  g_CommandsService.addCharacteristic(g_YawCharacteristic);
+  g_CommandsService.addCharacteristic(g_PitchCharacteristic);
+  g_CommandsService.addCharacteristic(g_RollCharacteristic);
   BLE.addService(g_CommandsService);
-
-
   BLE.advertise();
 
   // Wait until the central device connects:
@@ -76,11 +86,20 @@ void loop()
   }
   else
   {
-    //Serial.println(g_CentralDevice.rssi());
+    int32_t throttle = 0;
+    int32_t yaw = 0;
+    int32_t pitch = 0;
+    int32_t roll = 0;
+    
+    g_ThrottleCharacteristic.readValue(throttle);
+    g_YawCharacteristic.readValue(yaw);
+    g_PitchCharacteristic.readValue(pitch);
+    g_RollCharacteristic.readValue(roll);
 
-    int32_t val = 0;
-    g_ThrottleCharacteristic.readValue(val);
-    Serial.println(val);
+    Serial.print(throttle); Serial.print(",");
+    Serial.print(yaw); Serial.print(",");
+    Serial.print(pitch); Serial.print(",");
+    Serial.println(roll);
   }
 
   unsigned long startTime = millis();

@@ -21,34 +21,50 @@ public class Controller : MonoBehaviour
     public Dictionary<string,string> DiscoveredPeripherals; 
     private int SelectedPeripheralIdx = 0;
     public Dropdown DropdownUI;
+    public Button ConnectButtonUI;
 
     private string ConnectedToAdr = "NULL";
     public string CommandsServiceUID = "1101";
     public string ThrottleCharacteristicUID = "2202";
+    public string YawCharacteristicUID = "2203";
+    public string PitchleCharacteristicUID = "2204";
+    public string RollleCharacteristicUID = "2205";
+
+    public Joystick LeftJoystick;
+    public Joystick RightJoystick;
 
     // Timer to delay sending commands.
     private float ConnectTimer = 0.0f;
+    private float SendTimer = 999.0f;
+    // Time between each set of BT writes.
+    public float SendCommandsDelay = 0.2f;
 
     void Start()
     {
-        DiscoveredPeripherals = new Dictionary<string, string>();
-
+        DiscoveredPeripherals = new Dictionary<string, string>();        
         Input.location.Start();
 
-        bool initAsCentral = true;
-        bool initAsPeripheral = false;
-        BluetoothLEHardwareInterface.Initialize (initAsCentral, initAsPeripheral, 
-        () => 
+        if(!Application.isEditor)
         {
-            CurState = States.Scan;
-            BluetoothLEHardwareInterface.BluetoothScanMode(BluetoothLEHardwareInterface.ScanMode.LowLatency);
-            BluetoothLEHardwareInterface.BluetoothConnectionPriority(BluetoothLEHardwareInterface.ConnectionPriority.High);
-		},
-        (error) => 
+            bool initAsCentral = true;
+            bool initAsPeripheral = false;
+            BluetoothLEHardwareInterface.Initialize (initAsCentral, initAsPeripheral, 
+            () => 
+            {
+                UpdateState(States.Scan);
+                BluetoothLEHardwareInterface.BluetoothScanMode(BluetoothLEHardwareInterface.ScanMode.LowLatency);
+                BluetoothLEHardwareInterface.BluetoothConnectionPriority(BluetoothLEHardwareInterface.ConnectionPriority.High);
+		    },
+            (error) => 
+            {
+                Debug.Log(">>>>>>>>>>> [BLE ERROR] " + error);
+                CurState = States.Error;
+		    });   
+        }   
+        else
         {
-            Debug.Log(">>>>>>>>>>> [BLE ERROR] " + error);
-            CurState = States.Error;
-		});       
+            UpdateState(States.Connected);
+        } 
     }
 
     void Update()
@@ -60,8 +76,7 @@ public class Controller : MonoBehaviour
 
         if(CurState == States.Scan)
         {
-            Debug.Log(">>>>>>>>>>>>>>> Started scan <<<<<<<<<<<<<<<");   
-            CurState = States.Scanning;
+            UpdateState(States.Scanning);
             BluetoothLEHardwareInterface.ScanForPeripheralsWithServices (null, 
             (address, name) => 
             {    
@@ -82,9 +97,20 @@ public class Controller : MonoBehaviour
             ConnectTimer += Time.deltaTime;
             if(ConnectTimer > 2.0f)
             {
-                // We are connected!
-                int t = (int)(123.0f * (Mathf.Sin(Time.time * 0.5f) * 0.5f + 0.5f));
-                SendInt(t, CommandsServiceUID, ThrottleCharacteristicUID);
+                float throttle = Mathf.Max(LeftJoystick.Vertical * 100.0f, 0.0f);
+                float yaw = LeftJoystick.Horizontal * 100.0f;
+                float pitch = RightJoystick.Vertical * 100.0f;
+                float roll = RightJoystick.Horizontal * 100.0f;
+
+                SendTimer += Time.deltaTime;
+                if(SendTimer > SendCommandsDelay)
+                {
+                    SendTimer = 0.0f;
+                    SendInt((int)throttle, CommandsServiceUID, ThrottleCharacteristicUID);
+                    SendInt((int)yaw, CommandsServiceUID, YawCharacteristicUID);
+                    SendInt((int)pitch, CommandsServiceUID, PitchleCharacteristicUID);
+                    SendInt((int)roll, CommandsServiceUID, RollleCharacteristicUID);
+                }
             }
         }
         else
@@ -107,6 +133,13 @@ public class Controller : MonoBehaviour
         }
     }
 
+    private void ResetPeripherals()
+    {
+        DiscoveredPeripherals.Clear();
+        DropdownUI.options.Clear();
+        DropdownUI.RefreshShownValue();
+    }
+
     public void OnDropdownUIValueChange(int newIndex)
     {
         SelectedPeripheralIdx = newIndex;
@@ -114,6 +147,11 @@ public class Controller : MonoBehaviour
 
     public void OnConnectClicked()
     {
+        if(CurState ==  States.Connected)
+        {
+            return;
+        }
+
         var curOption = DropdownUI.options[SelectedPeripheralIdx];
         string[] data = curOption.text.Split(','); // name,addr
         ConnectedToAdr = data[1];
@@ -125,15 +163,18 @@ public class Controller : MonoBehaviour
             {
                 Debug.Log("Connected to: " + name);
                 BluetoothLEHardwareInterface.StopScan();
-                CurState = States.Connected;
+                UpdateState(States.Connected);
             }, null, 
             (address, serviceUUID, characteristicUUID) => 
             {
                 // This callback should be  giving us each service - char, but seems to only send the services.
-                // Debug.Log(">>>>>>>>> " + serviceUUID + ","   + characteristicUUID);
             }, (disconnectedAddress) => 
             {
-                // Handle diconnection ! ! ! 
+                // Reset state, go back to Scan:
+                ConnectTimer = 0.0f;
+                ConnectedToAdr = "NULL";
+                ResetPeripherals();
+                UpdateState(States.Scan);
             });
         }
     }
@@ -143,17 +184,32 @@ public class Controller : MonoBehaviour
 		return "0000" + uuid + "-0000-1000-8000-00805F9B34FB";
 	}
 
-    void SendInt(int value, string serviceUID, string characteristicUUID)
+    private void SendInt(int value, string serviceUID, string characteristicUUID)
     {
         string fullService = FullUUID(serviceUID);
         string fullCharacteristic = FullUUID(characteristicUUID);
-        //byte[] data = BitConverter.GetBytes(value);
-        byte[] test = new byte[1];
-        test[0] = 32;
-		BluetoothLEHardwareInterface.WriteCharacteristic (ConnectedToAdr, fullService, fullCharacteristic, test, 1, false, 
-        (charUID)=>
+        byte[] data = BitConverter.GetBytes(value);
+		BluetoothLEHardwareInterface.WriteCharacteristic (ConnectedToAdr, fullService, fullCharacteristic, data, data.Length, false, null);
+    }
+
+    private void UpdateState(States newState)
+    {
+        if(newState == States.Scan)
         {
-            Debug.Log(">>>>>>>>>>>>>>>>>>>>>" + charUID);
-        });
+            LeftJoystick.gameObject.SetActive(false);
+            RightJoystick.gameObject.SetActive(false);
+
+            DropdownUI.gameObject.SetActive(true);
+            ConnectButtonUI.gameObject.SetActive(true);
+        }
+        else if(newState == States.Connected)
+        {
+            LeftJoystick.gameObject.SetActive(true);
+            RightJoystick.gameObject.SetActive(true);
+            
+            DropdownUI.gameObject.SetActive(false);
+            ConnectButtonUI.gameObject.SetActive(false);
+        }
+        CurState = newState;
     }
 }

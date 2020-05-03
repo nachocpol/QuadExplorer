@@ -44,7 +44,11 @@
     <ImplicitlyExpandNETStandardFacades>false</ImplicitlyExpandNETStandardFacades>
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
   </PropertyGroup>
-  <ItemGroup>     <Compile Include="Assets\3rdParty\UnityBT\Editor\BluetoothPostProcessBuild.cs" />
+  <ItemGroup>     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Editor\DynamicJoystickEditor.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Editor\FloatingJoystickEditor.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Editor\JoystickEditor.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Editor\VariableJoystickEditor.cs" />
+     <Compile Include="Assets\3rdParty\UnityBT\Editor\BluetoothPostProcessBuild.cs" />
  <Reference Include="UnityEditor.TestRunner">
  <HintPath>D:/VisualStudio2015/Projects/QuadExplorer/ControllerApp/Library/ScriptAssemblies/UnityEditor.TestRunner.dll</HintPath>
  </Reference>

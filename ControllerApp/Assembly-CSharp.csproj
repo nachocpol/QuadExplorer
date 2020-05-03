@@ -44,7 +44,14 @@
     <ImplicitlyExpandNETStandardFacades>false</ImplicitlyExpandNETStandardFacades>
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
   </PropertyGroup>
-  <ItemGroup>     <Compile Include="Assets\3rdParty\UnityBT\Example\ArduinoHM10Test\ArduinoHM10Test.cs" />
+  <ItemGroup>     <Compile Include="Assets\3rdParty\Joystick Pack\Examples\JoystickPlayerExample.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Examples\JoystickSetterExample.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Base\Joystick.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Joysticks\DynamicJoystick.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Joysticks\FixedJoystick.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Joysticks\FloatingJoystick.cs" />
+     <Compile Include="Assets\3rdParty\Joystick Pack\Scripts\Joysticks\VariableJoystick.cs" />
+     <Compile Include="Assets\3rdParty\UnityBT\Example\ArduinoHM10Test\ArduinoHM10Test.cs" />
      <Compile Include="Assets\3rdParty\UnityBT\Example\BluetoothLETest\BLETestScript.cs" />
      <Compile Include="Assets\3rdParty\UnityBT\Example\BluetoothLETest\BusyScript.cs" />
      <Compile Include="Assets\3rdParty\UnityBT\Example\BluetoothLETest\Central\CentralNordicScript.cs" />
