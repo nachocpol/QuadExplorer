@@ -9,17 +9,18 @@ QuadFlyController FC;
 float g_TotalTime = 0.0f; // in s
 float g_DeltaTime = 0.0f; // in s
 
-const int k_PinMotor1 = 5;
-const int k_PinMotor2 = 4;
-const int k_PinMotor3 = 3;
-const int k_PinMotor4 = 2;
+const int k_PinMotorRR = 5; // Rear_Right
+const int k_PinMotorRL = 4; // Rear_Left
+const int k_PinMotorFL = 3; // Front_Left
+const int k_PinMotorFR = 2; // Front_Right
 
 BLEDevice g_CentralDevice;
 BLEService g_CommandsService("1101");
-BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLERead | BLEWriteWithoutResponse);
-BLEIntCharacteristic g_YawCharacteristic("2203", BLERead | BLEWriteWithoutResponse);
-BLEIntCharacteristic g_PitchCharacteristic("2204", BLERead | BLEWriteWithoutResponse);
-BLEIntCharacteristic g_RollCharacteristic("2205", BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLEWriteWithoutResponse);
+BLEIntCharacteristic g_YawCharacteristic("2203", BLEWriteWithoutResponse);
+BLEIntCharacteristic g_PitchCharacteristic("2204",BLEWriteWithoutResponse);
+BLEIntCharacteristic g_RollCharacteristic("2205", BLEWriteWithoutResponse);
+BLEByteCharacteristic g_StopCharacteristic("2206", BLEWrite)
 
 const float k_AccXOff = 0.04f;
 const float k_AccYOff = 0.03f;
@@ -51,7 +52,33 @@ void GetControlCommands(float& throttle, float& yaw, float& pitch, float& roll);
 void setup() 
 {
   Serial.begin(9600);
-  while (!Serial) {}
+  //while (!Serial) {}
+
+  // Test motors
+#if 0
+    analogWrite(k_PinMotorFL, 5);
+    delay(2500);
+    analogWrite(k_PinMotorFL, 0);
+
+    analogWrite(k_PinMotorFR, 5);
+    delay(2500);
+    analogWrite(k_PinMotorFR, 0);
+
+    analogWrite(k_PinMotorRR, 5);
+    delay(2500);
+    analogWrite(k_PinMotorRR, 0); 
+
+    analogWrite(k_PinMotorRL, 5);
+    delay(2500);
+    analogWrite(k_PinMotorRL, 0);
+
+    while(1){};
+#else
+  analogWrite(k_PinMotorFL, 0);
+  analogWrite(k_PinMotorFR, 0);
+  analogWrite(k_PinMotorRL, 0);
+  analogWrite(k_PinMotorRR, 0);
+#endif
 
   InitBLE();
   InitIMU();
@@ -62,8 +89,25 @@ void loop()
   // Check if still connected, this does the poll (with 0ms time out)
   if(!g_CentralDevice.connected())
   {
+    FC.Halt();
     Serial.println("Lost connection with central device");
+    analogWrite(k_PinMotorFL, 0);
+    analogWrite(k_PinMotorFR, 0);
+    analogWrite(k_PinMotorRL, 0);
+    analogWrite(k_PinMotorRR, 0);
     while(1);
+  }
+
+  // Just have one place to halt!
+  byte stop = 0x0;
+  g_StopCharacteristic.readValue(&stop, 1);
+  if(stop == 0x1)
+  {
+    analogWrite(k_PinMotorFL, 0);
+    analogWrite(k_PinMotorFR, 0);
+    analogWrite(k_PinMotorRL, 0);
+    analogWrite(k_PinMotorRR, 0);
+    while(1){};
   }
 
   unsigned long startTime = millis();
@@ -90,8 +134,17 @@ void loop()
     curCommands.RearLeftThr = -curCommands.RearLeftThr;
     curCommands.RearRightThr = -curCommands.RearRightThr;
 
+    int fl = (int)constrain((250.0f * curCommands.FrontLeftThr)  / 100.0f, 0.0f, 100.0f);
+    int fr = (int)constrain((250.0f * curCommands.FrontRightThr) / 100.0f, 0.0f, 100.0f);
+    int rl = (int)constrain((250.0f * curCommands.RearLeftThr)   / 100.0f, 0.0f, 100.0f);
+    int rr = (int)constrain((250.0f * curCommands.RearRightThr)  / 100.0f, 0.0f, 100.0f);
+    analogWrite(k_PinMotorFL, fl);
+    analogWrite(k_PinMotorFR, fr);
+    analogWrite(k_PinMotorRL, rl);
+    analogWrite(k_PinMotorRR, rr);
+
     // Debug:
-#if 1
+#if 0
     Serial.print(curCommands.FrontLeftThr);Serial.print(",");
     Serial.print(curCommands.FrontRightThr);Serial.print(",");
     Serial.print(curCommands.RearLeftThr);Serial.print(",");
@@ -122,6 +175,7 @@ void InitBLE()
   g_YawCharacteristic.setValue(0);
   g_PitchCharacteristic.setValue(0);
   g_RollCharacteristic.setValue(0);
+  g_StopCharacteristic.setValue(false);
 
   // Advertise commands service and characteristics:
   BLE.setLocalName("QuadExplorer");
@@ -130,6 +184,7 @@ void InitBLE()
   g_CommandsService.addCharacteristic(g_YawCharacteristic);
   g_CommandsService.addCharacteristic(g_PitchCharacteristic);
   g_CommandsService.addCharacteristic(g_RollCharacteristic);
+  g_CommandsService.addCharacteristic(g_StopCharacteristic);
   BLE.addService(g_CommandsService);
   BLE.advertise();
 
