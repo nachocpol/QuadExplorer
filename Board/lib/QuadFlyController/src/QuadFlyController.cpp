@@ -1,10 +1,14 @@
 #include "QuadFlyController.h"
 
 #ifdef _WIN32 
-#include <cmath>
-#include "Graphics/UI/IMGUI/imgui.h"
+	#include <cmath>
+	#include "Graphics/UI/IMGUI/imgui.h"
+	#include "glm/glm.hpp"
+	#define DEG_TO_RAD  0.017453292519943295769236907684886f
+	#define RAD_TO_DEG  57.295779513082320876798154814105f
+	#define constrain(x,a,b) glm::clamp(x,a,b);
 #else
-#include <Arduino.h>
+	#include <Arduino.h>
 #endif
 
 QuadFlyController::QuadFlyController()
@@ -38,130 +42,82 @@ void QuadFlyController::RenderUI()
 
 void QuadFlyController::Reset()
 {
-	mReachedTop = false;
-	mCountDown = 2.0f;
-	HeightSetPoint = 1.5f;
+	HeightSetPoint = 0.0f;
 	RollSetPoint = 0.0f;
-	mState = State::Initial;
+	mState = State::Idle;
 
 	HeightPID.Reset();
 	PitchPID.Reset();
 	RollPID.Reset();
 }
 
-FCCommands QuadFlyController::Iterate(const FCQuadState& state)
+FCCommands QuadFlyController::Iterate(const FCQuadState& state, const FCSetPoints& setPoints)
 {
-	FCCommands commands = {};
-
-	bool runPID = false;
-
 	// Check fail safe:
 	if(mState != State::FailSafe)
 	{
-		if (abs(state.Pitch) > 35.0f || abs(state.Roll) > 35.0f)
+		float pitchDeg = abs(state.Pitch * RAD_TO_DEG);
+		float rollDeg = abs(state.Roll * RAD_TO_DEG);
+		if (pitchDeg >  45.0f || rollDeg > 45.0f)
 		{
-			mState = State::FailSafe;
+			Halt();
 		}
 	}
 
+	FCCommands commands = {};
+	memset(&commands, 0, sizeof(FCCommands));
+
+	bool runPID = false;
 	switch (mState)
 	{
-		case State::Initial:
-		{
-			if (state.Time > 3.0f)
-			{
-				mState = State::Climbing;
-			}
-			break;
-		}
-
-		case State::Climbing:
+		case State::Idle:
 		{
 			runPID = true;
-
-			if (!mReachedTop)
-			{
-				float targetThreshold = 0.35f; // Reached target if within 10cm
-				if ((HeightSetPoint - state.Height) <= targetThreshold)
-				{
-					mReachedTop = true;
-				}
-			}
-			else
-			{
-				mCountDown -= state.DeltaTime;
-				if (mCountDown <= 0.0f)
-				{
-					mState = State::Descending;
-				}
-			}
 			break;
 		}
-
-		case State::Descending:
-		{
-			runPID = true;
-
-			if (HeightSetPoint > 0.0f)
-			{
-				HeightSetPoint -= 0.20f * state.DeltaTime; // Descend at 20cm per second
-			}
-
-			if (state.Height <= 0.1f)
-			{
-				mState = State::Done;
-			}
-
-			break;
-		}
-
-		case State::Done:
-		{
-			runPID = false;
-
-			break;
-		}
-
 		case State::FailSafe:
 		default:
 		{
 			runPID = false;
-
 			break;
 		}
 	}
 
-	// Height PID
-	float heightAction = 0.0f;
-	if(runPID)
-	{
-		float heightError = HeightSetPoint - state.Height;
-		heightAction = HeightPID.Get(heightError, state.DeltaTime);
-	}
-
-	// Pitch PID
-	float pitchAction = 0.0f;
+	// Get PID adjustments:
 	if (runPID)
 	{
-		float pitchError = PitchSetPoint - state.Pitch;
-		pitchAction = PitchPID.Get(pitchError, state.DeltaTime);
-	}
+		// Pitch PID
+		float pitchAction = 0.0f;
+		if (runPID)
+		{
+			float pitchError = setPoints.Pitch - state.Pitch;
+			pitchAction = PitchPID.Get(pitchError, state.DeltaTime);
+		}
 
-	// Roll PID
-	float rollAction = 0.0f;
-	if (runPID)
-	{
-		float rollError = RollSetPoint - state.Roll;
-		rollAction = RollPID.Get(rollError, state.DeltaTime);
-	}
+		// Roll PID
+		float rollAction = 0.0f;
+		if (runPID)
+		{
+			float rollError = setPoints.Roll - state.Roll;
+			rollAction = RollPID.Get(rollError, state.DeltaTime);
+		}
 
-	commands.FrontLeftThr = heightAction - rollAction - pitchAction;
-	commands.RearLeftThr = heightAction - rollAction + pitchAction;
-	
-	commands.FrontRightThr = heightAction + rollAction - pitchAction;
-	commands.RearRightThr = heightAction + rollAction + pitchAction;
+		pitchAction = constrain(pitchAction, -10.0f, 10.0f);
+		rollAction = constrain(rollAction, -10.0f, 10.0f);
+
+		commands.FrontLeftThr = setPoints.Thrust - rollAction - pitchAction;
+		commands.RearLeftThr = setPoints.Thrust - rollAction + pitchAction;
+		
+		commands.FrontRightThr = setPoints.Thrust + rollAction - pitchAction;
+		commands.RearRightThr = setPoints.Thrust + rollAction + pitchAction;
+	}
 
 	return commands;
+}
+
+void QuadFlyController::Halt()
+{
+	mState = State::FailSafe;
 }
 
 PID::PID(float kp, float ki, float kd)

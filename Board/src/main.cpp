@@ -5,7 +5,6 @@
 #include "QuadFlyController.h"
 
 QuadFlyController FC;
-FCQuadState State;
 
 float g_TotalTime = 0.0f; // in s
 float g_DeltaTime = 0.0f; // in s
@@ -36,104 +35,74 @@ void InitIMU();
 bool GetRawAccel(float& x, float& y, float& z);
 bool GetRawGyro(float& x, float& y, float& z);
 
+// Fills current orientation in degrees.
+void GetOrientation(float& yaw, float& pitch, float& roll);
+
+// Queries the commands from the connected controller app:
+//   Throttle [0,100]
+//   Yaw      [-100,100]
+//   Pitch    [-100,100]
+//   Roll     [-100,100]
+void GetControlCommandsRaw(int32_t* throttle, int32_t* yaw, int32_t* pitch, int32_t* roll);
+
+// Returns controls remaped (throt 0-100). Orientation in radians
+void GetControlCommands(float& throttle, float& yaw, float& pitch, float& roll);
+
 void setup() 
 {
   Serial.begin(9600);
   while (!Serial) {}
-  //InitBLE();
+
+  InitBLE();
   InitIMU();
 }
 
 void loop() 
 {
-  unsigned long startTime = millis();
-
-  bool IMUValid = true;
-  float rawPitch = 0.0f;
-  float rawRoll = 0.0f;
-
-  float ax, ay, az;
-  if(GetRawAccel(ax, ay, az))
-  {
-    float accMagnitude = sqrt((ax*ax) + (ay*ay) + (az*az));
-    rawPitch = atan2((ax / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;
-    rawRoll = atan2((-ay / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;   
-  }
-  else
-  {
-    Serial.println("ERROR READING ACCEL"); // Atm, we should stop the drone if we get this
-  }
-  
-
-  float wx, wy, wz;
-  if(!GetRawGyro(wx, wy, wz))
-  {
-    Serial.println("ERROR READING GYR"); // Atm, we should stop the drone if we get this
-  }
-
-  static float s_AcumYaw = 0.0f;
-  static float s_AcumPitch = 0.0f;
-  static float s_AcumRoll = 0.0f;
-  static bool s_FirstTime = true;
-
-  if(s_FirstTime)
-  {
-    s_FirstTime =  false;
-    s_AcumYaw = 0.0f;
-    s_AcumPitch = rawPitch;
-    s_AcumRoll = rawRoll;
-  }
-  else
-  {
-    s_AcumYaw += wz * g_DeltaTime;
-    s_AcumPitch += wy * g_DeltaTime;
-    s_AcumRoll += wx * g_DeltaTime;
-  }
-  
-  // Transfer angle as we have yawed:
-  s_AcumPitch -= s_AcumRoll * sin((wz * g_DeltaTime) * PI / 180.0f);
-  s_AcumRoll += s_AcumPitch * sin((wz * g_DeltaTime) * PI / 180.0f);
-
-  // Combine raw accel and gyro, this adds noise but removes gyro drift over time:
-  s_AcumPitch = s_AcumPitch * 0.9f + rawPitch * 0.1f;
-  s_AcumRoll = s_AcumRoll * 0.9f + rawRoll * 0.1f;
-
-  // Debug:
-  Serial.print(s_AcumPitch); Serial.print(",");
-  Serial.print(s_AcumYaw);Serial.print(",");
-  Serial.println(s_AcumRoll);
-
-  delay(10); // Workaround as we are sampling too fast the IMU..
-
-  // End of the iteration, compute delta, acum total:
-  g_DeltaTime = ((float)startTime - (float)millis()) / 1000.0f;
-  g_TotalTime += g_DeltaTime;
-
-#if 0
   // Check if still connected, this does the poll (with 0ms time out)
   if(!g_CentralDevice.connected())
   {
     Serial.println("Lost connection with central device");
     while(1);
   }
-  else
-  {
-    int32_t throttle = 0;
-    int32_t yaw = 0;
-    int32_t pitch = 0;
-    int32_t roll = 0;
-    
-    g_ThrottleCharacteristic.readValue(throttle);
-    g_YawCharacteristic.readValue(yaw);
-    g_PitchCharacteristic.readValue(pitch);
-    g_RollCharacteristic.readValue(roll);
 
-    Serial.print(throttle); Serial.print(",");
-    Serial.print(yaw); Serial.print(",");
-    Serial.print(pitch); Serial.print(",");
-    Serial.println(roll);
-  }
+  unsigned long startTime = millis();
+  {
+    // Setup quad state for this iteration:
+    FCQuadState curState = {};
+    GetOrientation(curState.Yaw, curState.Pitch, curState.Roll);
+    curState.Yaw *= DEG_TO_RAD;
+    curState.Pitch *= DEG_TO_RAD;
+    curState.Roll *= DEG_TO_RAD;
+    curState.DeltaTime = g_DeltaTime;
+    curState.Time = g_TotalTime;
+
+    // Query commands:
+    FCSetPoints setPoints;
+    GetControlCommands(setPoints.Thrust, setPoints.Yaw, setPoints.Pitch, setPoints.Roll);
+
+    // Iterate FC
+    FCCommands curCommands = FC.Iterate(curState, setPoints);
+
+    // Ug, reverse it to match sim frame of reference:
+    curCommands.FrontLeftThr = -curCommands.FrontLeftThr;
+    curCommands.FrontRightThr = -curCommands.FrontRightThr;
+    curCommands.RearLeftThr = -curCommands.RearLeftThr;
+    curCommands.RearRightThr = -curCommands.RearRightThr;
+
+    // Debug:
+#if 1
+    Serial.print(curCommands.FrontLeftThr);Serial.print(",");
+    Serial.print(curCommands.FrontRightThr);Serial.print(",");
+    Serial.print(curCommands.RearLeftThr);Serial.print(",");
+    Serial.println(curCommands.RearRightThr);
 #endif
+
+    delay(10); // Workaround as we are sampling too fast the IMU..
+  }
+  // End of the iteration, compute delta, acum total:
+  g_DeltaTime = ((float)startTime - (float)millis()) / 1000.0f;
+  g_TotalTime += g_DeltaTime;
 }
 
 void InitBLE()
@@ -286,4 +255,97 @@ bool GetRawGyro(float& x, float& y, float& z)
   y += k_GyroYOff;
   z += k_GyroZOff;
   return true;
+}
+
+void GetOrientation(float& yaw, float& pitch, float& roll)
+{
+  float rawPitch = 0.0f;
+  float rawRoll = 0.0f;
+
+  float ax, ay, az;
+  if(GetRawAccel(ax, ay, az))
+  {
+    float accMagnitude = sqrt((ax*ax) + (ay*ay) + (az*az));
+    rawPitch = atan2((ax / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;
+    rawRoll = atan2((-ay / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;   
+  }
+  else
+  {
+    Serial.println("ERROR READING ACCEL"); // Atm, we should stop the drone if we get this
+  }
+  
+  // TO-DO: if we detec huge dps, Halt FC.
+  float wx, wy, wz;
+  if(!GetRawGyro(wx, wy, wz))
+  {
+    Serial.println("ERROR READING GYR"); // Atm, we should stop the drone if we get this
+  }
+
+  static float s_AcumYaw = 0.0f;
+  static float s_AcumPitch = 0.0f;
+  static float s_AcumRoll = 0.0f;
+  static bool s_FirstTime = true;
+
+  if(s_FirstTime)
+  {
+    s_FirstTime =  false;
+    s_AcumYaw = 0.0f;
+    s_AcumPitch = rawPitch;
+    s_AcumRoll = rawRoll;
+  }
+  else
+  {
+    s_AcumYaw += wz * g_DeltaTime;
+    s_AcumPitch += wy * g_DeltaTime;
+    s_AcumRoll += wx * g_DeltaTime;
+  }
+  
+  // Transfer angle as we have yawed:
+    s_AcumPitch -= s_AcumRoll * sin((wz * g_DeltaTime) * DEG_TO_RAD);
+  s_AcumRoll += s_AcumPitch * sin((wz * g_DeltaTime) * DEG_TO_RAD);
+
+  // Combine raw accel and gyro, this adds noise but removes gyro drift over time:
+  s_AcumPitch = s_AcumPitch * 0.9f + rawPitch * 0.1f;
+  s_AcumRoll = s_AcumRoll * 0.9f + rawRoll * 0.1f;
+
+  yaw = s_AcumYaw;
+  pitch = s_AcumPitch;
+  roll = s_AcumRoll;
+
+  // Debug:
+#if 0
+  Serial.print(s_AcumPitch); Serial.print(",");
+  Serial.print(s_AcumYaw);Serial.print(",");
+  Serial.println(s_AcumRoll);
+#endif
+}
+
+void GetControlCommandsRaw(int32_t* throttle, int32_t* yaw, int32_t* pitch, int32_t* roll)
+{    
+  g_ThrottleCharacteristic.readValue(*throttle);
+  g_YawCharacteristic.readValue(*yaw);
+  g_PitchCharacteristic.readValue(*pitch);
+  g_RollCharacteristic.readValue(*roll);
+
+  // Debug:
+#if 0
+  Serial.print(throttle); Serial.print(",");
+  Serial.print(yaw); Serial.print(",");
+  Serial.print(pitch); Serial.print(",");
+  Serial.println(roll);
+#endif
+}
+
+void GetControlCommands(float& throttle, float& yaw, float& pitch, float& roll)
+{
+  int32_t rawThrottle, rawYaw, rawPitch, rawRoll;
+  GetControlCommandsRaw(&rawThrottle, &rawYaw, &rawPitch, &rawRoll);
+
+  float maxCommand = 20.0f; // Degrees
+
+  throttle = (float)constrain(rawThrottle, 0, 100);
+  // Reversed to match sim frame or reference:
+  yaw = -constrain(((float)rawYaw / 100.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
+  pitch = -constrain(((float)rawPitch / 100.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
+  roll = -constrain(((float)rawRoll / 100.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
 }

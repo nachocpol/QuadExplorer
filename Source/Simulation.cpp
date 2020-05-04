@@ -122,6 +122,8 @@ void Simulation::RunSimulation()
 		mQuadTarget->Position = glm::vec3(curTransform.p.x, curTransform.p.y, curTransform.p.z);
 		mQuadTarget->Orientation = glm::eulerAngles(glm::quat(curTransform.q.w, curTransform.q.x, curTransform.q.y, curTransform.q.z));
 
+		FCSetPoints setPoints;
+
 		// FC, run current iteration:
 		FCQuadState fcState;
 		fcState.DeltaTime = DeltaTime;
@@ -130,7 +132,7 @@ void Simulation::RunSimulation()
 		fcState.Yaw = mQuadTarget->Orientation.y;
 		fcState.Roll = mQuadTarget->Orientation.z;
 		fcState.Time = curTime;
-		FCCommands fcCommands = mFlightController->Iterate(fcState);
+		FCCommands fcCommands = mFlightController->Iterate(fcState, setPoints);
 
 		// Apply quad commands
 		glm::mat4 quadToWorld;

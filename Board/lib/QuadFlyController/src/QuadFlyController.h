@@ -1,15 +1,24 @@
 #pragma once
 
+// Output commands from the flight controller. Motor thrust 0-100.
 struct FCCommands
 {
-	// Throttle for each motor (0-100)
 	float FrontLeftThr;
 	float FrontRightThr;
 	float RearLeftThr;
 	float RearRightThr;
 };
 
-// Units: meters, radians, seconds.
+// Requested set points, the FC will generate commands to reach these set points. Units: radians
+struct FCSetPoints
+{
+	float Thrust;
+	float Yaw;
+	float Pitch;
+	float Roll;
+};
+
+// State required to iterate and generate commands. Units: meters, radians, seconds.
 struct FCQuadState
 {
 	float Height;
@@ -46,7 +55,8 @@ public:
 	QuadFlyController();
 	void RenderUI();
 	void Reset();
-	FCCommands Iterate(const FCQuadState& state);
+	FCCommands Iterate(const FCQuadState& state, const FCSetPoints& setPoints);
+	void Halt();
 
 	float HeightSetPoint;
 	float PitchSetPoint;
@@ -60,14 +70,10 @@ private:
 	{
 		enum T
 		{
-			Initial,
-			Climbing,
-			Descending,
-			Done,
+			Idle,
+			Flight,
 			FailSafe
 		};
 	};
 	State::T mState;   // State of the flight controller
-	float mCountDown;  // After reaching target altitude, how long to stay before descending
-	bool mReachedTop;
 };
