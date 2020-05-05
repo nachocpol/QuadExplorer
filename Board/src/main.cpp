@@ -16,11 +16,12 @@ const int k_PinMotorFR = 2; // Front_Right
 
 BLEDevice g_CentralDevice;
 BLEService g_CommandsService("1101");
-BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLEWriteWithoutResponse);
-BLEIntCharacteristic g_YawCharacteristic("2203", BLEWriteWithoutResponse);
-BLEIntCharacteristic g_PitchCharacteristic("2204",BLEWriteWithoutResponse);
-BLEIntCharacteristic g_RollCharacteristic("2205", BLEWriteWithoutResponse);
-BLEByteCharacteristic g_StopCharacteristic("2206", BLEWrite)
+BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_YawCharacteristic("2203", BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_PitchCharacteristic("2204",BLERead | BLEWriteWithoutResponse);
+BLEIntCharacteristic g_RollCharacteristic("2205", BLERead | BLEWriteWithoutResponse);
+BLEByteCharacteristic g_StopCharacteristic("2206", BLEWrite);
+BLEUnsignedLongCharacteristic g_PackedCharacteristic("2207", BLERead | BLEWriteWithoutResponse);
 
 const float k_AccXOff = 0.04f;
 const float k_AccYOff = 0.03f;
@@ -32,6 +33,7 @@ const float k_GyroZOff = -0.05f;
 
 void InitBLE();
 void InitIMU();
+void Halt();
 
 bool GetRawAccel(float& x, float& y, float& z);
 bool GetRawGyro(float& x, float& y, float& z);
@@ -86,32 +88,24 @@ void setup()
 
 void loop() 
 {
-  // Check if still connected, this does the poll (with 0ms time out)
-  if(!g_CentralDevice.connected())
-  {
-    FC.Halt();
-    Serial.println("Lost connection with central device");
-    analogWrite(k_PinMotorFL, 0);
-    analogWrite(k_PinMotorFR, 0);
-    analogWrite(k_PinMotorRL, 0);
-    analogWrite(k_PinMotorRR, 0);
-    while(1);
-  }
-
-  // Just have one place to halt!
-  byte stop = 0x0;
-  g_StopCharacteristic.readValue(&stop, 1);
-  if(stop == 0x1)
-  {
-    analogWrite(k_PinMotorFL, 0);
-    analogWrite(k_PinMotorFR, 0);
-    analogWrite(k_PinMotorRL, 0);
-    analogWrite(k_PinMotorRR, 0);
-    while(1){};
-  }
-
   unsigned long startTime = millis();
   {
+    // Check if still connected, this does the poll (with 0ms time out)
+    if(!g_CentralDevice.connected())
+    {
+      Serial.println("[HALT!] Lost connection with central device");
+      Halt();
+    }
+
+    // Check if controller requested emergency stop:
+    byte stop = 0x0;
+    g_StopCharacteristic.readValue(&stop, 1);
+    if(stop == 0x1)
+    {
+      Serial.println("[HALT!] Controller requested STOP");
+      Halt();
+    }
+
     // Setup quad state for this iteration:
     FCQuadState curState = {};
     GetOrientation(curState.Yaw, curState.Pitch, curState.Roll);
@@ -151,7 +145,7 @@ void loop()
     Serial.println(curCommands.RearRightThr);
 #endif
 
-    delay(10); // Workaround as we are sampling too fast the IMU..
+    delay(12); // Workaround as we are sampling too fast the IMU..
   }
   // End of the iteration, compute delta, acum total:
   g_DeltaTime = ((float)startTime - (float)millis()) / 1000.0f;
@@ -175,16 +169,18 @@ void InitBLE()
   g_YawCharacteristic.setValue(0);
   g_PitchCharacteristic.setValue(0);
   g_RollCharacteristic.setValue(0);
-  g_StopCharacteristic.setValue(false);
+  g_PackedCharacteristic.setValue(0);
+  //g_StopCharacteristic.setValue(false);
 
   // Advertise commands service and characteristics:
   BLE.setLocalName("QuadExplorer");
   BLE.setAdvertisedService(g_CommandsService);
-  g_CommandsService.addCharacteristic(g_ThrottleCharacteristic);
-  g_CommandsService.addCharacteristic(g_YawCharacteristic);
-  g_CommandsService.addCharacteristic(g_PitchCharacteristic);
-  g_CommandsService.addCharacteristic(g_RollCharacteristic);
+  //g_CommandsService.addCharacteristic(g_ThrottleCharacteristic);
+  //g_CommandsService.addCharacteristic(g_YawCharacteristic);
+  //g_CommandsService.addCharacteristic(g_PitchCharacteristic);
+  //g_CommandsService.addCharacteristic(g_RollCharacteristic);
   g_CommandsService.addCharacteristic(g_StopCharacteristic);
+  g_CommandsService.addCharacteristic(g_PackedCharacteristic);
   BLE.addService(g_CommandsService);
   BLE.advertise();
 
@@ -288,10 +284,31 @@ void InitIMU()
 #endif
 }
 
+void Halt()
+{
+  FC.Halt();
+  
+  analogWrite(k_PinMotorFL, 0);
+  analogWrite(k_PinMotorFR, 0);
+  analogWrite(k_PinMotorRL, 0);
+  analogWrite(k_PinMotorRR, 0);
+
+  while(1)
+  {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(250); 
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(250); 
+  }
+}
+
 bool GetRawAccel(float& x, float& y, float& z)
 {
   if(!IMU.accelerationAvailable() || !IMU.readAcceleration(x, y, z))
   {
+    x = 0.0f;
+    y = 0.0f;
+    z = 0.0f;
     return false;
   }
   x += k_AccXOff;
@@ -304,6 +321,9 @@ bool GetRawGyro(float& x, float& y, float& z)
 {
   if(!IMU.gyroscopeAvailable() || !IMU.readGyroscope(x, y, z))
   {
+    x = 0.0f;
+    y = 0.0f;
+    z = 0.0f;
     return false;
   }
   x += k_GyroXOff;
@@ -356,7 +376,7 @@ void GetOrientation(float& yaw, float& pitch, float& roll)
   }
   
   // Transfer angle as we have yawed:
-    s_AcumPitch -= s_AcumRoll * sin((wz * g_DeltaTime) * DEG_TO_RAD);
+  s_AcumPitch -= s_AcumRoll * sin((wz * g_DeltaTime) * DEG_TO_RAD);
   s_AcumRoll += s_AcumPitch * sin((wz * g_DeltaTime) * DEG_TO_RAD);
 
   // Combine raw accel and gyro, this adds noise but removes gyro drift over time:
@@ -377,17 +397,40 @@ void GetOrientation(float& yaw, float& pitch, float& roll)
 
 void GetControlCommandsRaw(int32_t* throttle, int32_t* yaw, int32_t* pitch, int32_t* roll)
 {    
-  g_ThrottleCharacteristic.readValue(*throttle);
-  g_YawCharacteristic.readValue(*yaw);
-  g_PitchCharacteristic.readValue(*pitch);
-  g_RollCharacteristic.readValue(*roll);
+  /*
+    result |= ((byte)throttle)     << 0 ;   8 bits (unsigned)
+    result |= ((byte)yaw >> 1)     << 8 ;   7 bits (signed)
+    result |= ((byte)pitch >> 1)   << 16;   7 bits (signed)
+    result |= ((byte)roll >> 1)    << 24    7 bits (signed)
+
+    result |= (yawNegative    ? 1 : 0) << 15;
+    result |= (pitchNegative  ? 1 : 0) << 23;
+    result |= (rollNegative   ? 1 : 0) << 31;
+  */
+
+  uint32_t packed = 0;
+  g_PackedCharacteristic.readValue(packed);
+
+  *throttle = (int32_t)((packed >> 0 ) & 0xFF);
+  *yaw      = (int32_t)((packed >> 8)  & 0x7F);
+  *pitch    = (int32_t)((packed >> 16) & 0x7F);
+  *roll     = (int32_t)((packed >> 24) & 0x7F);
+
+  *yaw    *= ((packed >> 15) & 0x1) ? -1 : 1;
+  *pitch  *= ((packed >> 23) & 0x1) ? -1 : 1;
+  *roll   *= ((packed >> 31) & 0x1) ? -1 : 1;
+
+  //g_ThrottleCharacteristic.readValue(*throttle);
+  //g_YawCharacteristic.readValue(*yaw);
+  //g_PitchCharacteristic.readValue(*pitch);
+  //g_RollCharacteristic.readValue(*roll);
 
   // Debug:
 #if 0
-  Serial.print(throttle); Serial.print(",");
-  Serial.print(yaw); Serial.print(",");
-  Serial.print(pitch); Serial.print(",");
-  Serial.println(roll);
+  Serial.print(*throttle); Serial.print(", \t");
+  Serial.print(*yaw); Serial.print(",\t");
+  Serial.print(*pitch); Serial.print(",\t");
+  Serial.println(*roll);
 #endif
 }
 

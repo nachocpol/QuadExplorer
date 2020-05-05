@@ -22,6 +22,9 @@ public class Controller : MonoBehaviour
     private int SelectedPeripheralIdx = 0;
     public Dropdown DropdownUI;
     public Button ConnectButtonUI;
+    public Button StopButtonUI;
+    public Joystick LeftJoystick;
+    public Joystick RightJoystick;
 
     private string ConnectedToAdr = "NULL";
     public string CommandsServiceUID = "1101";
@@ -29,9 +32,8 @@ public class Controller : MonoBehaviour
     public string YawCharacteristicUID = "2203";
     public string PitchleCharacteristicUID = "2204";
     public string RollleCharacteristicUID = "2205";
-
-    public Joystick LeftJoystick;
-    public Joystick RightJoystick;
+    public string StopCharacteristicUID = "2206";
+    public string PackedCharacteristicUID = "2207";
 
     // Timer to delay sending commands.
     private float ConnectTimer = 0.0f;
@@ -52,13 +54,14 @@ public class Controller : MonoBehaviour
             () => 
             {
                 UpdateState(States.Scan);
-                BluetoothLEHardwareInterface.BluetoothScanMode(BluetoothLEHardwareInterface.ScanMode.LowLatency);
-                BluetoothLEHardwareInterface.BluetoothConnectionPriority(BluetoothLEHardwareInterface.ConnectionPriority.High);
+                //BluetoothLEHardwareInterface.BluetoothScanMode(BluetoothLEHardwareInterface.ScanMode.LowLatency);
+                //BluetoothLEHardwareInterface.BluetoothConnectionPriority(BluetoothLEHardwareInterface.ConnectionPriority.High);
 		    },
             (error) => 
             {
                 Debug.Log(">>>>>>>>>>> [BLE ERROR] " + error);
                 CurState = States.Error;
+                HandleDisconnected();
 		    });   
         }   
         else
@@ -97,25 +100,51 @@ public class Controller : MonoBehaviour
             ConnectTimer += Time.deltaTime;
             if(ConnectTimer > 2.0f)
             {
-                float throttle = Mathf.Max(LeftJoystick.Vertical * 100.0f, 0.0f);
-                float yaw = LeftJoystick.Horizontal * 100.0f;
-                float pitch = RightJoystick.Vertical * 100.0f;
-                float roll = RightJoystick.Horizontal * 100.0f;
+                float throttle = Mathf.Max(LeftJoystick.Vertical * 255.0f, 0.0f);
+                float yaw = LeftJoystick.Horizontal * 127.0f;
+                float pitch = RightJoystick.Vertical * 127.0f;
+                float roll = RightJoystick.Horizontal * 127.0f;
 
                 SendTimer += Time.deltaTime;
                 if(SendTimer > SendCommandsDelay)
                 {
                     SendTimer = 0.0f;
-                    SendInt((int)throttle, CommandsServiceUID, ThrottleCharacteristicUID);
-                    SendInt((int)yaw, CommandsServiceUID, YawCharacteristicUID);
-                    SendInt((int)pitch, CommandsServiceUID, PitchleCharacteristicUID);
-                    SendInt((int)roll, CommandsServiceUID, RollleCharacteristicUID);
+                    //SendValue((int)throttle, CommandsServiceUID, ThrottleCharacteristicUID);
+                    //SendValue((int)yaw, CommandsServiceUID, YawCharacteristicUID);
+                    //SendValue((int)pitch, CommandsServiceUID, PitchleCharacteristicUID);
+                    //SendValue((int)roll, CommandsServiceUID, RollleCharacteristicUID);
+                    UInt32 packedCommands = PackCommands((int)throttle, (int)yaw, (int)pitch, (int)roll);
+                    SendValue(packedCommands,CommandsServiceUID, PackedCharacteristicUID);
                 }
             }
         }
         else
         {
         }
+    }
+
+    UInt32 PackCommands(int throttle, int yaw, int pitch, int roll)
+    {
+        UInt32 result = 0;
+
+        bool yawNegative = yaw < 0;
+        bool pitchNegative = pitch < 0;
+        bool rollNegative = roll < 0;
+
+        yaw   = Mathf.Abs(yaw);
+        pitch = Mathf.Abs(pitch);
+        roll  = Mathf.Abs(roll);
+
+        result |= (UInt32)((byte)throttle) << 0 ;
+        result |= (UInt32)((byte)yaw)      << 8 ;
+        result |= (UInt32)((byte)pitch)    << 16;
+        result |= (UInt32)((byte)roll)     << 24;
+
+        result |= (UInt32)(yawNegative   ? 1 : 0) << 15;
+        result |= (UInt32)(pitchNegative ? 1 : 0) << 23;
+        result |= (UInt32)(rollNegative  ? 1 : 0) << 31;
+
+        return result;
     }
 
     private void DiscoverPeripheral(string name, string adr)
@@ -170,13 +199,33 @@ public class Controller : MonoBehaviour
                 // This callback should be  giving us each service - char, but seems to only send the services.
             }, (disconnectedAddress) => 
             {
-                // Reset state, go back to Scan:
-                ConnectTimer = 0.0f;
-                ConnectedToAdr = "NULL";
-                ResetPeripherals();
-                UpdateState(States.Scan);
+                HandleDisconnected();
             });
         }
+    }
+
+    private void HandleDisconnected()
+    {
+        // Reset state, go back to Scan:
+        ConnectTimer = 0.0f;
+        ConnectedToAdr = "NULL";
+        ResetPeripherals();
+        UpdateState(States.Scan);
+    }
+
+    public void OnStopClicked()
+    {
+        // Send it with response, as this is a critical message!
+        string fullService = FullUUID(CommandsServiceUID);
+        string fullCharacteristic = FullUUID(StopCharacteristicUID);
+        byte[] one = new byte[1];
+        one[0] = 0x1;
+        BluetoothLEHardwareInterface.WriteCharacteristic(ConnectedToAdr, fullService, fullCharacteristic, one, 1, true, 
+        (msg)=>
+        {
+            Debug.Log(msg);
+            HandleDisconnected();
+        });
     }
 
     string FullUUID (string uuid)
@@ -184,7 +233,15 @@ public class Controller : MonoBehaviour
 		return "0000" + uuid + "-0000-1000-8000-00805F9B34FB";
 	}
 
-    private void SendInt(int value, string serviceUID, string characteristicUUID)
+    private void SendValue(int value, string serviceUID, string characteristicUUID)
+    {
+        string fullService = FullUUID(serviceUID);
+        string fullCharacteristic = FullUUID(characteristicUUID);
+        byte[] data = BitConverter.GetBytes(value);
+		BluetoothLEHardwareInterface.WriteCharacteristic (ConnectedToAdr, fullService, fullCharacteristic, data, data.Length, false, null);
+    }
+
+    private void SendValue(UInt32 value, string serviceUID, string characteristicUUID)
     {
         string fullService = FullUUID(serviceUID);
         string fullCharacteristic = FullUUID(characteristicUUID);
@@ -198,6 +255,7 @@ public class Controller : MonoBehaviour
         {
             LeftJoystick.gameObject.SetActive(false);
             RightJoystick.gameObject.SetActive(false);
+            StopButtonUI.gameObject.SetActive(false);
 
             DropdownUI.gameObject.SetActive(true);
             ConnectButtonUI.gameObject.SetActive(true);
@@ -206,7 +264,8 @@ public class Controller : MonoBehaviour
         {
             LeftJoystick.gameObject.SetActive(true);
             RightJoystick.gameObject.SetActive(true);
-            
+            StopButtonUI.gameObject.SetActive(true);
+
             DropdownUI.gameObject.SetActive(false);
             ConnectButtonUI.gameObject.SetActive(false);
         }
