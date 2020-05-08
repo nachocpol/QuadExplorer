@@ -16,12 +16,8 @@ const int k_PinMotorFR = 2; // Front_Right
 
 BLEDevice g_CentralDevice;
 BLEService g_CommandsService("1101");
-BLEIntCharacteristic g_ThrottleCharacteristic("2202", BLERead | BLEWriteWithoutResponse);
-BLEIntCharacteristic g_YawCharacteristic("2203", BLERead | BLEWriteWithoutResponse);
-BLEIntCharacteristic g_PitchCharacteristic("2204",BLERead | BLEWriteWithoutResponse);
-BLEIntCharacteristic g_RollCharacteristic("2205", BLERead | BLEWriteWithoutResponse);
 BLEByteCharacteristic g_StopCharacteristic("2206", BLEWrite);
-BLEUnsignedLongCharacteristic g_PackedCharacteristic("2207", BLERead | BLEWriteWithoutResponse);
+BLEUnsignedLongCharacteristic g_PackedCharacteristic("2207", BLERead | BLEWrite);
 
 const float k_AccXOff = 0.04f;
 const float k_AccYOff = 0.03f;
@@ -123,15 +119,16 @@ void loop()
     FCCommands curCommands = FC.Iterate(curState, setPoints);
 
     // Ug, reverse it to match sim frame of reference:
-    curCommands.FrontLeftThr = -curCommands.FrontLeftThr;
-    curCommands.FrontRightThr = -curCommands.FrontRightThr;
-    curCommands.RearLeftThr = -curCommands.RearLeftThr;
-    curCommands.RearRightThr = -curCommands.RearRightThr;
+    curCommands.FrontLeftThr = curCommands.FrontLeftThr;
+    curCommands.FrontRightThr = curCommands.FrontRightThr;
+    curCommands.RearLeftThr = curCommands.RearLeftThr;
+    curCommands.RearRightThr = curCommands.RearRightThr;
 
-    int fl = (int)constrain((250.0f * curCommands.FrontLeftThr)  / 100.0f, 0.0f, 100.0f);
-    int fr = (int)constrain((250.0f * curCommands.FrontRightThr) / 100.0f, 0.0f, 100.0f);
-    int rl = (int)constrain((250.0f * curCommands.RearLeftThr)   / 100.0f, 0.0f, 100.0f);
-    int rr = (int)constrain((250.0f * curCommands.RearRightThr)  / 100.0f, 0.0f, 100.0f);
+    float capThrottle = 250.0f;
+    int fl = (int)constrain((250.0f * curCommands.FrontLeftThr), 0.0f, capThrottle);
+    int fr = (int)constrain((250.0f * curCommands.FrontRightThr), 0.0f, capThrottle);
+    int rl = (int)constrain((250.0f * curCommands.RearLeftThr), 0.0f, capThrottle);
+    int rr = (int)constrain((250.0f * curCommands.RearRightThr), 0.0f, capThrottle);
     analogWrite(k_PinMotorFL, fl);
     analogWrite(k_PinMotorFR, fr);
     analogWrite(k_PinMotorRL, rl);
@@ -139,13 +136,18 @@ void loop()
 
     // Debug:
 #if 0
-    Serial.print(curCommands.FrontLeftThr);Serial.print(",");
-    Serial.print(curCommands.FrontRightThr);Serial.print(",");
-    Serial.print(curCommands.RearLeftThr);Serial.print(",");
+    Serial.print(curCommands.FrontLeftThr);Serial.print(",\t");
+    Serial.print(curCommands.FrontRightThr);Serial.print(",\t");
+    Serial.print(curCommands.RearLeftThr);Serial.print(",\t");
     Serial.println(curCommands.RearRightThr);
 #endif
 
-    delay(12); // Workaround as we are sampling too fast the IMU..
+#if 0
+    Serial.print(fl);Serial.print(",\t");
+    Serial.print(fr);Serial.print(",\t");
+    Serial.print(rl);Serial.print(",\t");
+    Serial.println(rr);
+#endif
   }
   // End of the iteration, compute delta, acum total:
   g_DeltaTime = ((float)startTime - (float)millis()) / 1000.0f;
@@ -165,20 +167,12 @@ void InitBLE()
   Serial.print("Local address is : "); Serial.println(bleAddress);
 
   // Ensure 0 initialized:
-  g_ThrottleCharacteristic.setValue(0);
-  g_YawCharacteristic.setValue(0);
-  g_PitchCharacteristic.setValue(0);
-  g_RollCharacteristic.setValue(0);
   g_PackedCharacteristic.setValue(0);
-  //g_StopCharacteristic.setValue(false);
+  g_StopCharacteristic.setValue(0);
 
   // Advertise commands service and characteristics:
   BLE.setLocalName("QuadExplorer");
   BLE.setAdvertisedService(g_CommandsService);
-  //g_CommandsService.addCharacteristic(g_ThrottleCharacteristic);
-  //g_CommandsService.addCharacteristic(g_YawCharacteristic);
-  //g_CommandsService.addCharacteristic(g_PitchCharacteristic);
-  //g_CommandsService.addCharacteristic(g_RollCharacteristic);
   g_CommandsService.addCharacteristic(g_StopCharacteristic);
   g_CommandsService.addCharacteristic(g_PackedCharacteristic);
   BLE.addService(g_CommandsService);
@@ -215,7 +209,7 @@ void InitIMU()
     Serial.println("Failed to init the IMU");
     while(1){};
   }
-  
+  //IMU.setContinuousMode(); // This enables the FIFO
   
   // TO-DO: automate calibration process:
 
@@ -334,28 +328,48 @@ bool GetRawGyro(float& x, float& y, float& z)
 
 void GetOrientation(float& yaw, float& pitch, float& roll)
 {
-  float rawPitch = 0.0f;
-  float rawRoll = 0.0f;
+  static float k_LastAx = 0.0f;
+  static float k_LastAy = 0.0f;
+  static float k_LastAz = 1.0f;
 
   float ax, ay, az;
   if(GetRawAccel(ax, ay, az))
-  {
-    float accMagnitude = sqrt((ax*ax) + (ay*ay) + (az*az));
-    rawPitch = atan2((ax / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;
-    rawRoll = atan2((-ay / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;   
+  {   
+    k_LastAx = ax;
+    k_LastAy = ay;
+    k_LastAz = az;
   }
   else
   {
-    Serial.println("ERROR READING ACCEL"); // Atm, we should stop the drone if we get this
+    ax = k_LastAx;
+    ay = k_LastAy;
+    az = k_LastAz;
+    //Serial.println("ERROR READING ACCEL"); // Atm, we should stop the drone if we get this
   }
+  float accMagnitude = sqrt((ax*ax) + (ay*ay) + (az*az));
+  float rawPitch = atan2((ax / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;
+  float rawRoll = atan2((-ay / accMagnitude) , (az / accMagnitude)) * RAD_TO_DEG;
   
   // TO-DO: if we detec huge dps, Halt FC.
-  float wx, wy, wz;
-  if(!GetRawGyro(wx, wy, wz))
-  {
-    Serial.println("ERROR READING GYR"); // Atm, we should stop the drone if we get this
-  }
+  static float k_LastWx = 0.0f;
+  static float k_LastWy = 0.0f;
+  static float k_LastWz = 0.0f;
 
+  float wx, wy, wz;
+  if(GetRawGyro(wx, wy, wz))
+  {
+    k_LastWx = wx;
+    k_LastWy = wy;
+    k_LastWz = wz;
+  }
+  else
+  {
+    wx = k_LastWx;
+    wy = k_LastWy;
+    wz = k_LastWz;
+    //Serial.println("ERROR READING GYR"); // Atm, we should stop the drone if we get this
+  }
+  
   static float s_AcumYaw = 0.0f;
   static float s_AcumPitch = 0.0f;
   static float s_AcumRoll = 0.0f;
@@ -370,28 +384,28 @@ void GetOrientation(float& yaw, float& pitch, float& roll)
   }
   else
   {
-    s_AcumYaw += wz * g_DeltaTime;
-    s_AcumPitch += wy * g_DeltaTime;
-    s_AcumRoll += wx * g_DeltaTime;
+    s_AcumYaw -= wz * g_DeltaTime;
+    s_AcumPitch -= wy * g_DeltaTime;
+    s_AcumRoll -= wx * g_DeltaTime;
   }
   
   // Transfer angle as we have yawed:
-  s_AcumPitch -= s_AcumRoll * sin((wz * g_DeltaTime) * DEG_TO_RAD);
-  s_AcumRoll += s_AcumPitch * sin((wz * g_DeltaTime) * DEG_TO_RAD);
+  s_AcumPitch -= s_AcumRoll * sin((-wz * g_DeltaTime) * DEG_TO_RAD);
+  s_AcumRoll += s_AcumPitch * sin((-wz * g_DeltaTime) * DEG_TO_RAD);
 
   // Combine raw accel and gyro, this adds noise but removes gyro drift over time:
-  s_AcumPitch = s_AcumPitch * 0.9f + rawPitch * 0.1f;
-  s_AcumRoll = s_AcumRoll * 0.9f + rawRoll * 0.1f;
+  s_AcumPitch = s_AcumPitch * 0.999f + rawPitch * 0.001f;
+  s_AcumRoll = s_AcumRoll * 0.999f + rawRoll * 0.001f;
 
   yaw = s_AcumYaw;
-  pitch = s_AcumPitch;
-  roll = s_AcumRoll;
+  pitch = -s_AcumPitch;
+  roll = -s_AcumRoll;
 
   // Debug:
 #if 0
-  Serial.print(s_AcumPitch); Serial.print(",");
-  Serial.print(s_AcumYaw);Serial.print(",");
-  Serial.println(s_AcumRoll);
+  Serial.print(pitch); Serial.print(",\t");
+  Serial.print(yaw);Serial.print(",\t");
+  Serial.println(roll);
 #endif
 }
 
@@ -420,11 +434,6 @@ void GetControlCommandsRaw(int32_t* throttle, int32_t* yaw, int32_t* pitch, int3
   *pitch  *= ((packed >> 23) & 0x1) ? -1 : 1;
   *roll   *= ((packed >> 31) & 0x1) ? -1 : 1;
 
-  //g_ThrottleCharacteristic.readValue(*throttle);
-  //g_YawCharacteristic.readValue(*yaw);
-  //g_PitchCharacteristic.readValue(*pitch);
-  //g_RollCharacteristic.readValue(*roll);
-
   // Debug:
 #if 0
   Serial.print(*throttle); Serial.print(", \t");
@@ -439,11 +448,12 @@ void GetControlCommands(float& throttle, float& yaw, float& pitch, float& roll)
   int32_t rawThrottle, rawYaw, rawPitch, rawRoll;
   GetControlCommandsRaw(&rawThrottle, &rawYaw, &rawPitch, &rawRoll);
 
-  float maxCommand = 20.0f; // Degrees
+  float maxCommand = 10.0f; // Degrees
 
-  throttle = (float)constrain(rawThrottle, 0, 100);
+  throttle = constrain((float)rawThrottle/255.0f, 0.0f, 0.9f); // Clamp so we dont saturate PIDs
+
   // Reversed to match sim frame or reference:
-  yaw = -constrain(((float)rawYaw / 100.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
-  pitch = -constrain(((float)rawPitch / 100.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
-  roll = -constrain(((float)rawRoll / 100.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
+  yaw = -constrain(((float)rawYaw / 127.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
+  pitch = constrain(((float)rawPitch / 127.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
+  roll = -constrain(((float)rawRoll / 127.0f) * maxCommand, -maxCommand, maxCommand) * DEG_TO_RAD;
 }

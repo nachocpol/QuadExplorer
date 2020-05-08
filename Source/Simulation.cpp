@@ -34,7 +34,7 @@ void Simulation::SetQuadTarget(Quad* quad)
 	mQuadTarget = quad;
 }
 
-void Simulation::SetFlightController(QuadFlyController* fc)
+void Simulation::SetFlightController(BaseFlyController* fc)
 {
 	mFlightController = fc;
 }
@@ -102,11 +102,11 @@ void Simulation::RunSimulation()
 	auto plane = PxCreatePlane(*physx, PxPlane(0.0f, 1.0f, 0.0f, 0.2f), *quadMat);
 	physxScene->addActor(*plane);
 
-#if 0
-	float rnd1 = 0.2f;
-	float rnd2 = -0.375f;
-	float rnd3 = 0.33f;
-	float rnd4 = -0.3f;
+#if 1
+	float rnd1 = 0.01f;
+	float rnd2 = -0.0175f;
+	float rnd3 = -0.0133f;
+	float rnd4 = -0.013f;
 #else
 	float rnd1 = 0.0f;
 	float rnd2 = 0.0f;
@@ -143,16 +143,17 @@ void Simulation::RunSimulation()
 		// Thrust per motor:
 		float dimX = mQuadTarget->Width * 0.5f;
 		float dimZ = mQuadTarget->Depth * 0.5f;
-		float flThrust = glm::clamp(fcCommands.FrontLeftThr, 0.0f, 1.0f) * (1.5f + rnd1);
+		float perMotorThrust = 0.3675f; // RaceStart 8250
+		float flThrust = glm::clamp(fcCommands.FrontLeftThr, 0.0f, 1.0f) * (perMotorThrust + rnd1);
 		PxRigidBodyExt::addLocalForceAtLocalPos(*rigidBody, PxVec3(0.0f, flThrust, 0.0f), PxVec3(-dimX, 0.0f, dimZ));
 
-		float rlThrust = glm::clamp(fcCommands.RearLeftThr,  0.0f, 1.0f) * (1.5f + rnd2);
+		float rlThrust = glm::clamp(fcCommands.RearLeftThr,  0.0f, 1.0f) * (perMotorThrust + rnd2);
 		PxRigidBodyExt::addLocalForceAtLocalPos(*rigidBody, PxVec3(0.0f, rlThrust, 0.0f), PxVec3(-dimX, 0.0f, -dimZ));
 
-		float frThrust = glm::clamp(fcCommands.FrontRightThr,0.0f, 1.0f) * (1.5f + rnd3);
+		float frThrust = glm::clamp(fcCommands.FrontRightThr,0.0f, 1.0f) * (perMotorThrust + rnd3);
 		PxRigidBodyExt::addLocalForceAtLocalPos(*rigidBody, PxVec3(0.0f, frThrust, 0.0f), PxVec3( dimX, 0.0f, dimZ));
 
-		float rrThrust = glm::clamp(fcCommands.RearRightThr, 0.0f, 1.0f) * (1.5f + rnd4);
+		float rrThrust = glm::clamp(fcCommands.RearRightThr, 0.0f, 1.0f) * (perMotorThrust + rnd4);
 		PxRigidBodyExt::addLocalForceAtLocalPos(*rigidBody, PxVec3(0.0f, rrThrust, 0.0f), PxVec3( dimX, 0.0f,-dimZ));
 
 		// Local frame to world frame:
@@ -161,20 +162,11 @@ void Simulation::RunSimulation()
 
 		// Query sim state, used for the 3D visualization:
 		SimulationFrame& frame = mResult.Frames[frameIdx];
+
 		frame.QuadOrientation = mQuadTarget->Orientation;
 		frame.QuadPosition = mQuadTarget->Position;
-		
-		frame.HeightPIDState.P = mFlightController->HeightPID.LastP;
-		frame.HeightPIDState.I = mFlightController->HeightPID.LastI;
-		frame.HeightPIDState.D = mFlightController->HeightPID.LastD;
-
-		frame.PitchPIDState.P = mFlightController->PitchPID.LastP;
-		frame.PitchPIDState.I = mFlightController->PitchPID.LastI;
-		frame.PitchPIDState.D = mFlightController->PitchPID.LastD;
-
-		frame.RollPIDState.P = mFlightController->RollPID.LastP;
-		frame.RollPIDState.I = mFlightController->RollPID.LastI;
-		frame.RollPIDState.D = mFlightController->RollPID.LastD;
+	
+		mFlightController->QuerySimState(&frame);
 
 		//frame.WorldForce = worldForce;
 

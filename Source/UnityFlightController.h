@@ -2,14 +2,14 @@
 
 #include "CommonFlyController.h"
 
-class QuadFlyController : public BaseFlyController
+class UnityFlyController : public BaseFlyController
 {
 public:
-	QuadFlyController();
+	UnityFlyController();
 	void RenderUI() override;
 	void Reset() override;
 	FCCommands Iterate(const FCQuadState& state, const FCSetPoints& setPoints) override;
-	void Halt() override;
+	void Halt() override; 
 
 #ifdef _WIN32 
 	void QuerySimState(SimulationFrame* simFrame) override;
@@ -19,17 +19,17 @@ public:
 	float PitchSetPoint;
 	float RollSetPoint;
 	PID HeightPID = PID(0.5f, 0.0f, 0.2f);
-	PID PitchPID = PID(0.202f, 0.0f, 0.02f);
-	PID RollPID = PID(0.202f, 0.0f, 0.02f);
+	PID PitchPID = PID(0.202f, 0.0f, 0.053f);
+	PID RollPID = PID(0.202f, 0.0f, 0.053f);
 
 private:
 	struct State
 	{
 		enum T
 		{
-			Idle,
-			Flight,
-			FailSafe
+			Initial,
+			Ascend,
+			Traverse
 		};
 	};
 	State::T mState;   // State of the flight controller

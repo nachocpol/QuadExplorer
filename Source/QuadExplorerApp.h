@@ -6,7 +6,7 @@
 
 #include "Simulation.h"
 #include "Quad.h"
-#include "QuadFlyController.h"
+#include "UnityFlightController.h"
 #include "Coms/SerialCom.h"
 
 namespace World
@@ -35,7 +35,7 @@ private:
 
 	Simulation mSimulation;
 	Quad mQuad;
-	QuadFlyController mFlyController;
+	UnityFlyController* mFlyController;
 	float mCurTime;
 	float mVisualizationSpeed;
 	bool mLoopVisualization;

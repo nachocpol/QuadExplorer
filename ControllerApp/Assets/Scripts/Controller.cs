@@ -25,6 +25,8 @@ public class Controller : MonoBehaviour
     public Button StopButtonUI;
     public Joystick LeftJoystick;
     public Joystick RightJoystick;
+    public Slider RollTrimUI;
+    public Slider PitchTrimUI;
 
     private string ConnectedToAdr = "NULL";
     public string CommandsServiceUID = "1101";
@@ -41,6 +43,8 @@ public class Controller : MonoBehaviour
     // Time between each set of BT writes.
     public float SendCommandsDelay = 0.2f;
 
+    private static bool PendingResponse = false;
+
     void Start()
     {
         DiscoveredPeripherals = new Dictionary<string, string>();        
@@ -54,8 +58,8 @@ public class Controller : MonoBehaviour
             () => 
             {
                 UpdateState(States.Scan);
-                //BluetoothLEHardwareInterface.BluetoothScanMode(BluetoothLEHardwareInterface.ScanMode.LowLatency);
-                //BluetoothLEHardwareInterface.BluetoothConnectionPriority(BluetoothLEHardwareInterface.ConnectionPriority.High);
+                BluetoothLEHardwareInterface.BluetoothScanMode(BluetoothLEHardwareInterface.ScanMode.LowLatency);
+                BluetoothLEHardwareInterface.BluetoothConnectionPriority(BluetoothLEHardwareInterface.ConnectionPriority.High);
 		    },
             (error) => 
             {
@@ -102,8 +106,8 @@ public class Controller : MonoBehaviour
             {
                 float throttle = Mathf.Max(LeftJoystick.Vertical * 255.0f, 0.0f);
                 float yaw = LeftJoystick.Horizontal * 127.0f;
-                float pitch = RightJoystick.Vertical * 127.0f;
-                float roll = RightJoystick.Horizontal * 127.0f;
+                float pitch = Mathf.Clamp((RightJoystick.Vertical * 127.0f) + PitchTrimUI.value, -127.0f, 127.0f);
+                float roll = Mathf.Clamp((RightJoystick.Horizontal * 127.0f) + RollTrimUI.value, -127.0f, 127.0f);
 
                 SendTimer += Time.deltaTime;
                 if(SendTimer > SendCommandsDelay)
@@ -206,7 +210,12 @@ public class Controller : MonoBehaviour
 
     private void HandleDisconnected()
     {
+        if(ConnectedToAdr != "NULL")
+        {
+            BluetoothLEHardwareInterface.DisconnectPeripheral(ConnectedToAdr, null);
+        }
         // Reset state, go back to Scan:
+        PendingResponse = false;
         ConnectTimer = 0.0f;
         ConnectedToAdr = "NULL";
         ResetPeripherals();
@@ -243,10 +252,19 @@ public class Controller : MonoBehaviour
 
     private void SendValue(UInt32 value, string serviceUID, string characteristicUUID)
     {
-        string fullService = FullUUID(serviceUID);
-        string fullCharacteristic = FullUUID(characteristicUUID);
-        byte[] data = BitConverter.GetBytes(value);
-		BluetoothLEHardwareInterface.WriteCharacteristic (ConnectedToAdr, fullService, fullCharacteristic, data, data.Length, false, null);
+        if(!PendingResponse)
+        {
+            PendingResponse = true;
+            string fullService = FullUUID(serviceUID);
+            string fullCharacteristic = FullUUID(characteristicUUID);
+            byte[] data = BitConverter.GetBytes(value);
+		    BluetoothLEHardwareInterface.WriteCharacteristic (ConnectedToAdr, fullService, fullCharacteristic, data, data.Length, true, 
+            (msg)=>
+            {
+                Debug.Log(msg);
+                PendingResponse = false;
+            });
+        }
     }
 
     private void UpdateState(States newState)
@@ -270,5 +288,14 @@ public class Controller : MonoBehaviour
             ConnectButtonUI.gameObject.SetActive(false);
         }
         CurState = newState;
+    }
+
+    private void OnApplicationPause (bool paused)
+    {
+        // Atm we can't allow a pause, so just disconnect:
+        if(paused)
+        {
+            HandleDisconnected();
+        }
     }
 }

@@ -1,4 +1,4 @@
-#include "QuadFlyController.h"
+#include "UnityFlightController.h"
 
 #ifdef _WIN32 
 	#include "Simulation.h"
@@ -12,12 +12,12 @@
 	#include <Arduino.h>
 #endif
 
-QuadFlyController::QuadFlyController()
+UnityFlyController::UnityFlyController()
 {
 	Reset();
 }
 
-void QuadFlyController::RenderUI()
+void UnityFlyController::RenderUI()
 {
 #ifdef _WIN32 
 	if (ImGui::TreeNode("Height PID"))
@@ -41,57 +41,71 @@ void QuadFlyController::RenderUI()
 #endif
 }
 
-void QuadFlyController::Reset()
+void UnityFlyController::Reset()
 {
 	HeightSetPoint = 0.0f;
 	RollSetPoint = 0.0f;
-	mState = State::Idle;
+	mState = State::Initial;
 
 	HeightPID.Reset();
 	PitchPID.Reset();
 	RollPID.Reset();
 }
 
-FCCommands QuadFlyController::Iterate(const FCQuadState& state, const FCSetPoints& setPoints)
+FCCommands UnityFlyController::Iterate(const FCQuadState& state, const FCSetPoints& setPoints)
 {
-	// Check fail safe:
-	if(mState != State::FailSafe)
-	{
-		float pitchDeg = abs(state.Pitch * RAD_TO_DEG);
-		float rollDeg = abs(state.Roll * RAD_TO_DEG);
-		if (pitchDeg >  45.0f || rollDeg > 45.0f)
-		{
-			Halt();
-		}
-	}
-
 	FCCommands commands = {};
 	memset(&commands, 0, sizeof(FCCommands));
+
+	float HeightSetPoint = 0.0f;
+	float RollSetPoint = 0.0f;
+	float PitchSetPoint = 0.0f;
 
 	bool runPID = false;
 	switch (mState)
 	{
-		case State::Idle:
+	case State::Initial:
+	{
+		if (state.Time > 1.5f)
 		{
-			runPID = true;
-			break;
+			mState = State::Ascend;
 		}
-		case State::FailSafe:
-		default:
+		break;
+	}
+	case State::Ascend:
+	{
+		PitchSetPoint = 20.0f * DEG_TO_RAD;
+		if (state.Time > 5.0f)
 		{
-			runPID = false;
-			break;
+			RollSetPoint = -20.0 * DEG_TO_RAD;
 		}
+		runPID = true;
+		HeightSetPoint = 3.0f;
+		break;
+	}
+	default:
+	{
+		runPID = false;
+		break;
+	}
 	}
 
 	// Get PID adjustments:
 	if (runPID)
 	{
+		// Height action
+		float heightAction = 0.0f;
+		if (runPID)
+		{
+			float heightError = HeightSetPoint - state.Height;
+			heightAction = HeightPID.Get(heightError, state.DeltaTime);
+		}
+
 		// Pitch PID
 		float pitchAction = 0.0f;
 		if (runPID)
 		{
-			float pitchError = setPoints.Pitch - state.Pitch;
+			float pitchError = PitchSetPoint - state.Pitch;
 			pitchAction = PitchPID.Get(pitchError, state.DeltaTime);
 		}
 
@@ -99,30 +113,31 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state, const FCSetPoint
 		float rollAction = 0.0f;
 		if (runPID)
 		{
-			float rollError = setPoints.Roll - state.Roll;
+			float rollError = RollSetPoint - state.Roll;
 			rollAction = RollPID.Get(rollError, state.DeltaTime);
 		}
 
 		pitchAction = constrain(pitchAction, -1.0f, 1.0f);
 		rollAction = constrain(rollAction, -1.0f, 1.0f);
+		heightAction = constrain(heightAction, 0.0f, 0.9f);
 
-		commands.FrontLeftThr = setPoints.Thrust - rollAction - pitchAction;
-		commands.RearLeftThr = setPoints.Thrust - rollAction + pitchAction;
-		
-		commands.FrontRightThr = setPoints.Thrust + rollAction - pitchAction;
-		commands.RearRightThr = setPoints.Thrust + rollAction + pitchAction;
+		commands.FrontLeftThr = heightAction - rollAction - pitchAction;
+		commands.RearLeftThr = heightAction - rollAction + pitchAction;
+
+		commands.FrontRightThr = heightAction + rollAction - pitchAction;
+		commands.RearRightThr = heightAction + rollAction + pitchAction;
 	}
 
 	return commands;
 }
 
-void QuadFlyController::Halt()
+void UnityFlyController::Halt()
 {
-	mState = State::FailSafe;
+	//mState = State::FailSafe;
 }
 
 #ifdef _WIN32 
-void QuadFlyController::QuerySimState(SimulationFrame* simFrame)
+void UnityFlyController::QuerySimState(SimulationFrame* simFrame)
 {
 	simFrame->HeightPIDState.P = HeightPID.LastP;
 	simFrame->HeightPIDState.I = HeightPID.LastI;

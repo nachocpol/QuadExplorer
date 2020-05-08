@@ -3,7 +3,7 @@
 #include "Graphics/UI/IMGUI/imgui.h"
 
 Quad::Quad():
-	 Mass(0.2f)
+	 Mass(0.081f)
 	,Width(0.16f)
 	,Height(0.05f)
 	,Depth(0.16f)

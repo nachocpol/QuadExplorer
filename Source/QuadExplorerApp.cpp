@@ -39,7 +39,8 @@ void QuadExplorerApp::Init()
 	// Setup simulation and quad:
 	mSimulation.Init();
 	mSimulation.SetQuadTarget(&mQuad);
-	mSimulation.SetFlightController(&mFlyController);
+	mFlyController = new UnityFlyController;
+	mSimulation.SetFlightController(mFlyController);
 
 	// Setup visualization:
 	mCubeModel = Graphics::ModelFactory::Get()->LoadFromFile("assets:Meshes/cube.obj", mGraphicsInterface);
@@ -276,7 +277,7 @@ void QuadExplorerApp::RenderUI()
 		}
 		if (ImGui::CollapsingHeader("Fly Controller"))
 		{
-			mFlyController.RenderUI();
+			mFlyController->RenderUI();
 		}
 	}
 	ImGui::End();
