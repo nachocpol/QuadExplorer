@@ -4,6 +4,8 @@
 
 #include "QuadFlyController.h"
 
+//#define DISABLE_BLE
+
 QuadFlyController FC;
 
 float g_TotalTime = 0.0f; // in s
@@ -15,9 +17,15 @@ const int k_PinMotorFL = 3; // Front_Left
 const int k_PinMotorFR = 2; // Front_Right
 
 BLEDevice g_CentralDevice;
+
 BLEService g_CommandsService("1101");
 BLEByteCharacteristic g_StopCharacteristic("2206", BLEWrite);
 BLEUnsignedLongCharacteristic g_PackedCharacteristic("2207", BLERead | BLEWrite);
+
+BLEService g_TelemetryService("1102");
+BLEFloatCharacteristic g_YawCharacteristic("3301", BLERead);
+BLEFloatCharacteristic g_PitchCharacteristic("3302", BLERead);
+BLEFloatCharacteristic g_RollCharacteristic("3303", BLERead);
 
 const float k_AccXOff = 0.04f;
 const float k_AccYOff = 0.03f;
@@ -78,7 +86,9 @@ void setup()
   analogWrite(k_PinMotorRR, 0);
 #endif
 
+#ifndef DISABLE_BLE
   InitBLE();
+#endif
   InitIMU();
 }
 
@@ -86,6 +96,7 @@ void loop()
 {
   unsigned long startTime = millis();
   {
+#ifndef DISABLE_BLE
     // Check if still connected, this does the poll (with 0ms time out)
     if(!g_CentralDevice.connected())
     {
@@ -101,7 +112,7 @@ void loop()
       Serial.println("[HALT!] Controller requested STOP");
       Halt();
     }
-
+#endif
     // Setup quad state for this iteration:
     FCQuadState curState = {};
     GetOrientation(curState.Yaw, curState.Pitch, curState.Roll);
@@ -170,12 +181,23 @@ void InitBLE()
   g_PackedCharacteristic.setValue(0);
   g_StopCharacteristic.setValue(0);
 
-  // Advertise commands service and characteristics:
   BLE.setLocalName("QuadExplorer");
+
+  // Advertise commands service and characteristics:
   BLE.setAdvertisedService(g_CommandsService);
   g_CommandsService.addCharacteristic(g_StopCharacteristic);
   g_CommandsService.addCharacteristic(g_PackedCharacteristic);
   BLE.addService(g_CommandsService);
+
+  // Telemetry:
+#if 0
+  BLE.setAdvertisedService(g_TelemetryService);
+  g_TelemetryService.addCharacteristic(g_YawCharacteristic);
+  g_TelemetryService.addCharacteristic(g_PitchCharacteristic);
+  g_TelemetryService.addCharacteristic(g_RollCharacteristic);
+  BLE.addService(g_TelemetryService);
+#endif
+
   BLE.advertise();
 
   // Wait until the central device connects:
@@ -394,8 +416,8 @@ void GetOrientation(float& yaw, float& pitch, float& roll)
   s_AcumRoll += s_AcumPitch * sin((-wz * g_DeltaTime) * DEG_TO_RAD);
 
   // Combine raw accel and gyro, this adds noise but removes gyro drift over time:
-  s_AcumPitch = s_AcumPitch * 0.999f + rawPitch * 0.001f;
-  s_AcumRoll = s_AcumRoll * 0.999f + rawRoll * 0.001f;
+  s_AcumPitch = s_AcumPitch * 0.9996f + rawPitch * 0.0004f;
+  s_AcumRoll = s_AcumRoll * 0.9996f + rawRoll * 0.0004f;
 
   yaw = s_AcumYaw;
   pitch = -s_AcumPitch;
@@ -406,6 +428,12 @@ void GetOrientation(float& yaw, float& pitch, float& roll)
   Serial.print(pitch); Serial.print(",\t");
   Serial.print(yaw);Serial.print(",\t");
   Serial.println(roll);
+#endif
+
+#if 0
+  g_PitchCharacteristic.setValue(pitch);
+  g_YawCharacteristic.setValue(yaw);
+  g_RollCharacteristic.setValue(roll);
 #endif
 }
 
@@ -423,7 +451,9 @@ void GetControlCommandsRaw(int32_t* throttle, int32_t* yaw, int32_t* pitch, int3
   */
 
   uint32_t packed = 0;
+#ifndef DISABLE_BLE
   g_PackedCharacteristic.readValue(packed);
+#endif
 
   *throttle = (int32_t)((packed >> 0 ) & 0xFF);
   *yaw      = (int32_t)((packed >> 8)  & 0x7F);

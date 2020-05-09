@@ -20,6 +20,7 @@ public class Controller : MonoBehaviour
     // Map of peripherals. Key is the address.
     public Dictionary<string,string> DiscoveredPeripherals; 
     private int SelectedPeripheralIdx = 0;
+
     public Dropdown DropdownUI;
     public Button ConnectButtonUI;
     public Button StopButtonUI;
@@ -27,23 +28,30 @@ public class Controller : MonoBehaviour
     public Joystick RightJoystick;
     public Slider RollTrimUI;
     public Slider PitchTrimUI;
+    public Transform QuadViewer;
 
     private string ConnectedToAdr = "NULL";
+
     public string CommandsServiceUID = "1101";
-    public string ThrottleCharacteristicUID = "2202";
-    public string YawCharacteristicUID = "2203";
-    public string PitchleCharacteristicUID = "2204";
-    public string RollleCharacteristicUID = "2205";
     public string StopCharacteristicUID = "2206";
     public string PackedCharacteristicUID = "2207";
+
+    public string TelemetryServiceUID =  "1102";
+    public string YawTelemetryCharacteristicUID = "3301";
+    public string PitchTelemetryCharacteristicUID = "3302";
+    public string RollTelemetryCharacteristicUID = "3302";
 
     // Timer to delay sending commands.
     private float ConnectTimer = 0.0f;
     private float SendTimer = 999.0f;
+    private float ReadTimer = 999.0f;
     // Time between each set of BT writes.
     public float SendCommandsDelay = 0.2f;
-
     private static bool PendingResponse = false;
+
+    private float CurYaw = 0.0f;
+    private float CurPitch = 0.0f;
+    private float CurRoll = 0.0f;
 
     void Start()
     {
@@ -113,13 +121,12 @@ public class Controller : MonoBehaviour
                 if(SendTimer > SendCommandsDelay)
                 {
                     SendTimer = 0.0f;
-                    //SendValue((int)throttle, CommandsServiceUID, ThrottleCharacteristicUID);
-                    //SendValue((int)yaw, CommandsServiceUID, YawCharacteristicUID);
-                    //SendValue((int)pitch, CommandsServiceUID, PitchleCharacteristicUID);
-                    //SendValue((int)roll, CommandsServiceUID, RollleCharacteristicUID);
                     UInt32 packedCommands = PackCommands((int)throttle, (int)yaw, (int)pitch, (int)roll);
                     SendValue(packedCommands,CommandsServiceUID, PackedCharacteristicUID);
                 }
+                
+                //RetrieveTelemetry();
+                //QuadViewer.eulerAngles = new Vector3(CurRoll * Mathf.Rad2Deg, 0.0f, CurPitch * Mathf.Rad2Deg);
             }
         }
         else
@@ -215,6 +222,9 @@ public class Controller : MonoBehaviour
             BluetoothLEHardwareInterface.DisconnectPeripheral(ConnectedToAdr, null);
         }
         // Reset state, go back to Scan:
+        CurRoll = 0.0f;
+        CurPitch = 0.0f;
+        CurYaw = 0.0f;
         PendingResponse = false;
         ConnectTimer = 0.0f;
         ConnectedToAdr = "NULL";
@@ -267,6 +277,47 @@ public class Controller : MonoBehaviour
         }
     }
 
+    static int PendingReads = 0;
+    private void RetrieveTelemetry()
+    {
+        if(PendingReads == 0 && ReadTimer > 0.25f)
+        {
+            ReadTimer = 0.0f;
+            PendingReads = 3;
+
+            BluetoothLEHardwareInterface.ReadCharacteristic(ConnectedToAdr, FullUUID(TelemetryServiceUID), FullUUID(YawTelemetryCharacteristicUID),
+            (uuid, data) =>
+            {
+                PendingReads--;
+                if(data.Length == 4)
+                {
+                    CurYaw = BitConverter.ToSingle(data, 0);
+                }
+            });
+
+            BluetoothLEHardwareInterface.ReadCharacteristic(ConnectedToAdr, FullUUID(TelemetryServiceUID), FullUUID(PitchTelemetryCharacteristicUID),
+            (uuid, data) =>
+            {
+                PendingReads--;
+                if(data.Length == 4)
+                {
+                    CurPitch = BitConverter.ToSingle(data, 0);
+                }
+            });
+
+            BluetoothLEHardwareInterface.ReadCharacteristic(ConnectedToAdr, FullUUID(TelemetryServiceUID), FullUUID(RollTelemetryCharacteristicUID),
+            (uuid, data) =>
+            {
+                PendingReads--;
+                if(data.Length == 4)
+                {
+                    CurRoll = BitConverter.ToSingle(data, 0);
+                }
+            });
+        }
+        ReadTimer += Time.deltaTime;
+    }
+
     private void UpdateState(States newState)
     {
         if(newState == States.Scan)
@@ -277,6 +328,8 @@ public class Controller : MonoBehaviour
 
             DropdownUI.gameObject.SetActive(true);
             ConnectButtonUI.gameObject.SetActive(true);
+
+            QuadViewer.gameObject.SetActive(false);
         }
         else if(newState == States.Connected)
         {
@@ -286,6 +339,8 @@ public class Controller : MonoBehaviour
 
             DropdownUI.gameObject.SetActive(false);
             ConnectButtonUI.gameObject.SetActive(false);
+
+            //QuadViewer.gameObject.SetActive(true);
         }
         CurState = newState;
     }
