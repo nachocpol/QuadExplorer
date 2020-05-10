@@ -113,7 +113,7 @@ public class Controller : MonoBehaviour
             if(ConnectTimer > 2.0f)
             {
                 float throttle = Mathf.Max(LeftJoystick.Vertical * 255.0f, 0.0f);
-                float yaw = LeftJoystick.Horizontal * 127.0f;
+                float yaw = Mathf.Clamp(LeftJoystick.Horizontal * 127.0f, -127.0f, 127.0f);
                 float pitch = Mathf.Clamp((RightJoystick.Vertical * 127.0f) + PitchTrimUI.value, -127.0f, 127.0f);
                 float roll = Mathf.Clamp((RightJoystick.Horizontal * 127.0f) + RollTrimUI.value, -127.0f, 127.0f);
 

@@ -16,14 +16,14 @@ float PID::Get(float error, float deltaTime)
 {
 	float P = error;
 
-	float I = 0.0f;
+	mIntegral = mIntegral + error * deltaTime;
 
 	float D = mFirst ? 0.0f : (error - mPrevError) / deltaTime;
 	mFirst = false;
 	mPrevError = error;
 
 	LastP = P * KP;
-	LastI = I * KI;
+	LastI = mIntegral * KI;
 	LastD = D * KD;
 
 	return LastP + LastI + LastD;
@@ -33,6 +33,7 @@ void PID::Reset()
 {
 	mFirst = true;
 	mPrevError = 0.0f;
+	mIntegral = 0.0f;
 
 	LastP = 0.0f;
 	LastI = 0.0f;

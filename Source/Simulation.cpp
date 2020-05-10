@@ -104,9 +104,9 @@ void Simulation::RunSimulation()
 
 #if 1
 	float rnd1 = 0.01f;
-	float rnd2 = -0.0175f;
-	float rnd3 = -0.0133f;
-	float rnd4 = -0.013f;
+	float rnd2 = 0.0175f;
+	float rnd3 = 0.0233f;
+	float rnd4 = 0.0137f;
 #else
 	float rnd1 = 0.0f;
 	float rnd2 = 0.0f;
@@ -132,6 +132,12 @@ void Simulation::RunSimulation()
 		fcState.Yaw = mQuadTarget->Orientation.y;
 		fcState.Roll = mQuadTarget->Orientation.z;
 		fcState.Time = curTime;
+		// Add noise
+		{
+			fcState.Pitch += glm::linearRand(-0.08f, 0.08f);
+			fcState.Yaw += glm::linearRand(-0.08f, 0.08f);
+			fcState.Roll += glm::linearRand(-0.08f, 0.08f);
+		}
 		FCCommands fcCommands = mFlightController->Iterate(fcState, setPoints);
 
 		// Apply quad commands

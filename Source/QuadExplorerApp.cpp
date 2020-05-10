@@ -248,21 +248,21 @@ void QuadExplorerApp::RenderUI()
 				if (ImGui::CollapsingHeader("Height"))
 				{
 					plotPID_P("P", dat);
-					//plotPID_I("I", dat);
+					plotPID_I("I", dat);
 					plotPID_D("D", dat);
 				}
 				dat.Type = SimulationFrame::Pitch;
 				if (ImGui::CollapsingHeader("Pitch"))
 				{
 					plotPID_P("P", dat);
-					//plotPID_I("I", dat);
+					plotPID_I("I", dat);
 					plotPID_D("D", dat);
 				}
 				dat.Type = SimulationFrame::Roll;
 				if (ImGui::CollapsingHeader("Roll"))
 				{
 					plotPID_P("P", dat);
-					//plotPID_I("I", dat);
+					plotPID_I("I", dat);
 					plotPID_D("D", dat);
 				}
 			}

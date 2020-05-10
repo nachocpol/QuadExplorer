@@ -47,6 +47,7 @@ public:
 private:
 	bool mFirst = true;
 	float mPrevError = 0.0f;
+	float mIntegral = 0.0f;
 };
 
 struct SimulationFrame;

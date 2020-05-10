@@ -27,13 +27,13 @@ BLEFloatCharacteristic g_YawCharacteristic("3301", BLERead);
 BLEFloatCharacteristic g_PitchCharacteristic("3302", BLERead);
 BLEFloatCharacteristic g_RollCharacteristic("3303", BLERead);
 
-const float k_AccXOff = 0.04f;
-const float k_AccYOff = 0.03f;
+const float k_AccXOff = 0.02f;
+const float k_AccYOff = 0.01f;
 const float k_AccZOff = -0.01f;
 
-const float k_GyroXOff = -0.32f;
-const float k_GyroYOff = -0.475f;
-const float k_GyroZOff = -0.05f;
+const float k_GyroXOff = -1.0f;
+const float k_GyroYOff = -0.3f;
+const float k_GyroZOff = -0.5f;
 
 void InitBLE();
 void InitIMU();
@@ -95,6 +95,7 @@ void setup()
 void loop() 
 {
   unsigned long startTime = millis();
+
   {
 #ifndef DISABLE_BLE
     // Check if still connected, this does the poll (with 0ms time out)
@@ -126,6 +127,23 @@ void loop()
     FCSetPoints setPoints;
     GetControlCommands(setPoints.Thrust, setPoints.Yaw, setPoints.Pitch, setPoints.Roll);
 
+    static bool k_WasIdle = true;
+    static float k_CurYawPoint = 0.0f;
+    if(setPoints.Thrust <= 0.0f)
+    {
+      k_WasIdle = true;
+      FC.Reset();
+    }
+    else
+    {
+      if(k_WasIdle)
+      {
+        k_CurYawPoint = curState.Yaw;
+      }
+      k_WasIdle = false;
+      setPoints.Yaw = k_CurYawPoint;
+    }
+
     // Iterate FC
     FCCommands curCommands = FC.Iterate(curState, setPoints);
 
@@ -135,11 +153,10 @@ void loop()
     curCommands.RearLeftThr = curCommands.RearLeftThr;
     curCommands.RearRightThr = curCommands.RearRightThr;
 
-    float capThrottle = 250.0f;
-    int fl = (int)constrain((250.0f * curCommands.FrontLeftThr), 0.0f, capThrottle);
-    int fr = (int)constrain((250.0f * curCommands.FrontRightThr), 0.0f, capThrottle);
-    int rl = (int)constrain((250.0f * curCommands.RearLeftThr), 0.0f, capThrottle);
-    int rr = (int)constrain((250.0f * curCommands.RearRightThr), 0.0f, capThrottle);
+    int fl = (int)constrain((255.0f * curCommands.FrontLeftThr), 0.0f, 255.0f);
+    int fr = (int)constrain((255.0f * curCommands.FrontRightThr), 0.0f, 255.0f);
+    int rl = (int)constrain((255.0f * curCommands.RearLeftThr), 0.0f, 255.0f);
+    int rr = (int)constrain((255.0f * curCommands.RearRightThr), 0.0f, 255.0f);
     analogWrite(k_PinMotorFL, fl);
     analogWrite(k_PinMotorFR, fr);
     analogWrite(k_PinMotorRL, rl);
@@ -160,6 +177,7 @@ void loop()
     Serial.println(rr);
 #endif
   }
+
   // End of the iteration, compute delta, acum total:
   g_DeltaTime = ((float)startTime - (float)millis()) / 1000.0f;
   g_TotalTime += g_DeltaTime;
@@ -265,6 +283,7 @@ void InitIMU()
   Serial.print(totalY);
   Serial.print('\t');
   Serial.println(totalZ);
+  while(1){};
 #endif
 
   // Gyro calibration:
@@ -297,6 +316,7 @@ void InitIMU()
   Serial.print(totalY);
   Serial.print('\t');
   Serial.println(totalZ);
+  while(1){};
 #endif
 }
 

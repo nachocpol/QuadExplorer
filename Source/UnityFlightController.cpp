@@ -74,7 +74,7 @@ FCCommands UnityFlyController::Iterate(const FCQuadState& state, const FCSetPoin
 	}
 	case State::Ascend:
 	{
-		PitchSetPoint = 20.0f * DEG_TO_RAD;
+		//PitchSetPoint = 20.0f * DEG_TO_RAD;
 		if (state.Time > 5.0f)
 		{
 			RollSetPoint = -20.0 * DEG_TO_RAD;

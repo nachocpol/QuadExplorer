@@ -19,37 +19,15 @@ QuadFlyController::QuadFlyController()
 
 void QuadFlyController::RenderUI()
 {
-#ifdef _WIN32 
-	if (ImGui::TreeNode("Height PID"))
-	{
-		ImGui::InputFloat("Set Point", &HeightSetPoint);
-		HeightPID.RenderUI();
-		ImGui::TreePop();
-	}
-	if (ImGui::TreeNode("Pitch PID"))
-	{
-		ImGui::InputFloat("Set Point", &PitchSetPoint);
-		PitchPID.RenderUI();
-		ImGui::TreePop();
-	}
-	if (ImGui::TreeNode("Roll PID"))
-	{
-		ImGui::InputFloat("Set Point", &RollSetPoint);
-		RollPID.RenderUI();
-		ImGui::TreePop();
-	}
-#endif
 }
 
 void QuadFlyController::Reset()
 {
-	HeightSetPoint = 0.0f;
-	RollSetPoint = 0.0f;
 	mState = State::Idle;
 
-	HeightPID.Reset();
 	PitchPID.Reset();
 	RollPID.Reset();
+	YawPID.Reset();
 }
 
 FCCommands QuadFlyController::Iterate(const FCQuadState& state, const FCSetPoints& setPoints)
@@ -103,14 +81,23 @@ FCCommands QuadFlyController::Iterate(const FCQuadState& state, const FCSetPoint
 			rollAction = RollPID.Get(rollError, state.DeltaTime);
 		}
 
+		// Yaw PID
+		float yawAction = 0.0f;
+		if (runPID)
+		{
+			float yawError = setPoints.Yaw - state.Yaw;
+			yawAction = YawPID.Get(yawError, state.DeltaTime);
+		}
+
 		pitchAction = constrain(pitchAction, -1.0f, 1.0f);
 		rollAction = constrain(rollAction, -1.0f, 1.0f);
+		yawAction = constrain(yawAction, -1.0f, 1.0f);
 
-		commands.FrontLeftThr = setPoints.Thrust - rollAction - pitchAction;
-		commands.RearLeftThr = setPoints.Thrust - rollAction + pitchAction;
+		commands.FrontLeftThr = setPoints.Thrust - rollAction - pitchAction + yawAction;
+		commands.RearLeftThr = setPoints.Thrust - rollAction + pitchAction - yawAction;
 		
-		commands.FrontRightThr = setPoints.Thrust + rollAction - pitchAction;
-		commands.RearRightThr = setPoints.Thrust + rollAction + pitchAction;
+		commands.FrontRightThr = setPoints.Thrust + rollAction - pitchAction - yawAction;
+		commands.RearRightThr = setPoints.Thrust + rollAction + pitchAction + yawAction;
 	}
 
 	return commands;
@@ -124,9 +111,7 @@ void QuadFlyController::Halt()
 #ifdef _WIN32 
 void QuadFlyController::QuerySimState(SimulationFrame* simFrame)
 {
-	simFrame->HeightPIDState.P = HeightPID.LastP;
-	simFrame->HeightPIDState.I = HeightPID.LastI;
-	simFrame->HeightPIDState.D = HeightPID.LastD;
+
 
 	simFrame->PitchPIDState.P = PitchPID.LastP;
 	simFrame->PitchPIDState.I = PitchPID.LastI;

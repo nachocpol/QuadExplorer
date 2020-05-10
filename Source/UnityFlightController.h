@@ -19,8 +19,8 @@ public:
 	float PitchSetPoint;
 	float RollSetPoint;
 	PID HeightPID = PID(0.5f, 0.0f, 0.2f);
-	PID PitchPID = PID(0.6f, 0.0f, 0.032f);
-	PID RollPID = PID(0.6f, 0.0f, 0.032f);
+	PID PitchPID = PID(0.121f, 0.0f, 0.016f);
+	PID RollPID = PID(0.121f, 0.0f, 0.016f);
 
 private:
 	struct State
